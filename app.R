@@ -8,6 +8,7 @@ usePackage <- function(p) {
 }
 
 usePackage("shiny")
+usePackage("shinycssloader")
 usePackage("shinydashboard")
 usePackage("DT")
 usePackage("openxlsx")
@@ -16,6 +17,7 @@ usePackage("ggplot2")
 usePackage("gtsummary")
 
 library(shiny)
+library(shinycssloader)
 library(shinydashboard)
 library(DT)
 library(openxlsx)
