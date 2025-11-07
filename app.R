@@ -208,25 +208,25 @@ create_split <- function(data, train_ratio = 0.7, target_col, seed = NULL) {
   if (!is.null(seed)) {
     set.seed(seed)
   }
-
+  
   if (!target_col %in% names(data)) {
     stop(paste("the column ", target_col, " does not exist in the data frame"))
   }
-
+  
   target_values <- data[[target_col]]
   unique_classes <- unique(target_values)
-
-
+  
+  
   train_indices <- c()
   for (class in unique_classes) {
     class_indices <- which(target_values == class)
     n_class <- length(class_indices)
-
+    
     n_train_class <- floor(n_class * train_ratio)
     if (n_train_class == 0 && n_class > 0) {
       n_train_class <- 1
     }
-
+    
     if (n_train_class > 0 && n_train_class < n_class) {
       train_class_indices <- sample(class_indices, size = n_train_class)
       train_indices <- c(train_indices, train_class_indices)
@@ -237,9 +237,9 @@ create_split <- function(data, train_ratio = 0.7, target_col, seed = NULL) {
       }
     }
   }
-
+  
   validation_indices <- setdiff(1:nrow(data), train_indices)
-
+  
   list(
     train = data[train_indices, ],
     validation = data[validation_indices, ]
@@ -575,247 +575,247 @@ export_split_to_excel <- function(split_data, file_path, target_col, clinic_vars
 
 library(shiny)
 ui <- fluidPage(
-    titlePanel(
-      div(
-        img(src = 'cut-out.png', height = "40px", width = "40px"),
-        "Data Spliter"
-        )   
-      ),
-    ## image icon 
-    # tags$head(
-    #   tags$img(height = "100px" , width = "100px", src = "pictures/cut-out.jpg")
-    # ),
-    br(nrow = 1),
-    hr(),
-    sidebarLayout(
-        sidebarPanel(
-          width = 3,
-          wellPanel(
-            fluidRow(
-              box(
-                title = "Data upload",
-                status = "primary",
-                solidHeader = TRUE,
-                width = 12,
-                radioButtons("file_type",label =  "Type of file :",
-                             choices = c("CSV" = "csv", "Excel" = "excel"),
-                             selected = "csv",
-                             inline = TRUE),
-                fileInput("file", "upload a file",
-                          accept = c(".csv", ".txt", ".xlsx", ".xls")),
-                helpText("Maximum size = 5Mb"),
-                # actionButton("load_btn", "Charger les données",
-                #              icon = icon("upload"),
-                #              class = "btn-info"),
-                hr()#,
-                # helpText("1. Sélectionnez le type de fichier et configurez les paramètres"),
-                # helpText("2. Choisissez votre fichier"),
-                # helpText("3. Cliquez sur 'Charger les données'")
-              ),
-              box(
-                title = "",
-                status = "primary",
-                solidHeader = TRUE,
-                width = 12,
-                
-                conditionalPanel(
-                  condition = "input.file_type == 'csv'",
-                  fluidRow(
-                    column(5,
-                           selectInput("csv_sep", "Séparateur :",
-                                       choices = c("Virgule (,)" = ",",
-                                                   "Point-virgule (;)" = ";",
-                                                   "Tabulation" = "\t",
-                                                   "Espace" = " "),
-                                       selected = ",")
-                    ),
-                    column(
-                      width = 5, 
-                      selectInput("csv_dec", "Caractère décimal :",
-                                  choices = c("Point (.)" = ".",
-                                              "Virgule (,)" = ","),
-                                  selected = ".")
-                    )
-                  )
-                  ,
-                  textInput("csv_na", "Chaîne pour valeurs manquantes :",
-                            value = "NA",
-                            placeholder = "NA, vide, NULL, etc."),
-                  helpText("
+  titlePanel(
+    div(
+      img(src = 'cut-out.png', height = "40px", width = "40px"),
+      "Data Spliter"
+    )   
+  ),
+  ## image icon 
+  # tags$head(
+  #   tags$img(height = "100px" , width = "100px", src = "pictures/cut-out.jpg")
+  # ),
+  br(nrow = 1),
+  hr(),
+  sidebarLayout(
+    sidebarPanel(
+      width = 3,
+      wellPanel(
+        fluidRow(
+          box(
+            title = "Data upload",
+            status = "primary",
+            solidHeader = TRUE,
+            width = 12,
+            radioButtons("file_type",label =  "Type of file :",
+                         choices = c("CSV" = "csv", "Excel" = "excel"),
+                         selected = "csv",
+                         inline = TRUE),
+            fileInput("file", "upload a file",
+                      accept = c(".csv", ".txt", ".xlsx", ".xls")),
+            helpText("Maximum size = 5Mb"),
+            # actionButton("load_btn", "Charger les données",
+            #              icon = icon("upload"),
+            #              class = "btn-info"),
+            hr()#,
+            # helpText("1. Sélectionnez le type de fichier et configurez les paramètres"),
+            # helpText("2. Choisissez votre fichier"),
+            # helpText("3. Cliquez sur 'Charger les données'")
+          ),
+          box(
+            title = "",
+            status = "primary",
+            solidHeader = TRUE,
+            width = 12,
+            
+            conditionalPanel(
+              condition = "input.file_type == 'csv'",
+              fluidRow(
+                column(5,
+                       selectInput("csv_sep", "Séparateur :",
+                                   choices = c("Virgule (,)" = ",",
+                                               "Point-virgule (;)" = ";",
+                                               "Tabulation" = "\t",
+                                               "Espace" = " "),
+                                   selected = ",")
+                ),
+                column(
+                  width = 5, 
+                  selectInput("csv_dec", "Caractère décimal :",
+                              choices = c("Point (.)" = ".",
+                                          "Virgule (,)" = ","),
+                              selected = ".")
+                )
+              )
+              ,
+              textInput("csv_na", "Chaîne pour valeurs manquantes :",
+                        value = "NA",
+                        placeholder = "NA, vide, NULL, etc."),
+              helpText("
                            
                            ")
-                  #Séparez plusieurs chaînes par des virgules (ex: NA,vide,NULL)
-                )
-                ,checkboxInput("transpose_data", "Transpose",value = FALSE)
-                # ,
-                # helpText("Check this box if your variables are in rows instead of columns.")
-              )
+              #Séparez plusieurs chaînes par des virgules (ex: NA,vide,NULL)
             )
-            
-          # radioButtons("filetype", "Select file type:",
-          #              choices = c("CSV" = "csv",
-          #                          "Excel" = "excel"),
-          #              inline =T),
-          # fileInput("datafiles", 
-          #           label = h4("data File"),
-          #           accept =  c("text/csv",
-          #                       "application/vnd.ms-excel",
-          #                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          #                       ".xls",".xlsx")
-          #   ),
-          # # fluidRow pour la gestion des format 
-          # fluidRow(
-          #   conditionalPanel("input.filetype == 'csv'",
-          #     column(6,
-          #            textInput("dec", 
-          #                      'character for decimal point', 
-          #                      value = ".")
-          #            ),
-          #     column(6,
-          #       textInput("NAstring", 
-          #                 label = "character for missing value", 
-          #                 value = "NA")
-          #     )
-          #   )
-          # ),
-          # 
-          # fluidRow(
-          #   conditionalPanel(
-          #     condition = "input.filetype == 'csv'",
-          #     radioButtons('sep', 'Separator',
-          #                  c(Comma=',', Semicolon=';', Tab='\t'),
-          #                  inline = TRUE ) 
-          #   ),
-          #   fluidRow(
-          #     conditionalPanel(
-          #       condition = "input.filetype == 'excel'",
-          #       column(6,
-          #              numericInput("skipn",label = "number of lines to skip",value = 0)
-          #       ),
-          #       column(6,
-          #              numericInput("sheetn",label = "sheet",value = 1)
-          #       )
-          #     )
-          #   )
-          # ),
-          # 
-          # hr(),
-          # br(nrow = 2),
-          # checkboxInput("transpose","Transpose the table",FALSE),
-          # checkboxInput("zeroegalNA","consider 0 as NA",FALSE) ,
-          # actionButton("confirmdatabutton","Confirm data", 
-          #              style = "background-color: blue;
-          #                         color: white;
-          #                         border-color: blue;")
-          
-         )# 
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-          conditionalPanel( condition = "!output.Uploadfile",
-                          h3("The purpose of this application is to provide a user-friendly tool for generating multiple train cuts/validations from omics data.",
-                               align="center"),
-                          fluidRow(column(6,imageOutput("image1")),
-                                   column(2,imageOutput("image2"))),
-                          br(),
-                          h4("This application is developped in the 12th team of I2MC for internal used.",align="center")
-          ), 
-          conditionalPanel(condition = "output.Uploadfile", 
-                         tabsetPanel(id = 'tab_split', 
-                                     tabPanel( "DATA",
-                                               icon = icon("table"),
-                                               fluidRow(
-                                                 box(
-                                                   title = "Data overview",
-                                                   status = "info",
-                                                   solidHeader = TRUE,
-                                                   width = 12,
-                                                   DTOutput("data_preview") %>% withSpinner(color="#0dc5c1",
-                                                                                            type = 1)
-                                                 )
-                                               )
-                                     ),
-                                     tabPanel( "SPLITS",
-                                               icon = icon("scissors"),
-                                               # fluidPage(
-                                               #   tags$head(
-                                               #     tags$style(
-                                               #       HTML("
-                                               #         #generation_log {
-                                               #           color : gray;
-                                               #           background-color : #F0F8FF;
-                                               #           font-family : 'Courier New', Courier, monospace;
-                                               #           font-size : 12px;
-                                               #         }
-                                               #       ")
-                                               #     )
-                                               #   )
-                                               # ), 
-                                               fluidRow(
-                                                 box(
-                                                   title = "Parametrs of split",
-                                                   status = "warning",
-                                                   solidHeader = TRUE,
-                                                   width = 6,
-                                                   selectInput("target_col", "Classification variable (target/label) :",
-                                                               choices = NULL),
-                                                   sliderInput("train_ratio", " Train size (%) :",
-                                                               min = 50, max = 95, value = 70, step = 1),
-                                                   numericInput("n_splits", "Number of splits :",
-                                                                value = 15, min = 1, max = 100, step = 1),
-                                                   
-                                                   hr(),
-                                                   #br(nrow =2),
-                                                   uiOutput('get_clinivars')
-                                                   # shinyjs::disable(
-                                                     # numericInput("base_seed", "Base random seed :",
-                                                     #                             value = 123, min = 1, max = 10000)
-                                                     #) ,
-                                                   #helpText("N seeds will be generated: base_seed, base_seed+1, ..., base_seed+N-1")
-                                                 ),
-                                                 box(
-                                                   title = "Data information",
-                                                   status = "success",
-                                                   solidHeader = TRUE,
-                                                   height = 6,
-                                                   width = 6,
-                                                   verbatimTextOutput("data_info")
-                                                 )
-                                               ),
-                                               fluidRow(
-                                                 box(
-                                                   title = "Generate splits",
-                                                   status = "primary",
-                                                   solidHeader = TRUE,
-                                                   width = 6,
-                                                   actionButton("generate_btn", "Générer les splits",
-                                                                icon = icon("play"),
-                                                                class = "btn-success btn-lg"),
-                                                   hr(),
-                                                   verbatimTextOutput("generation_log")
-                                                 )
-                                               )
-                                               
-                                     ),
-                                     tabPanel("DOWNLOAD",
-                                              icon = icon("download"),
-                                              fluidRow(
-                                                box(
-                                                  title = "Downloading files",
-                                                  status = "success",
-                                                  solidHeader = TRUE,
-                                                  width = 12,
-                                                  uiOutput("download_buttons"),
-                                                  hr(),
-                                                  helpText("Each Excel file contains three sheets: Train, Validation, and Statistics.")
-                                                )
-                                      )
-                                  )
-                      )
-               )
+            ,checkboxInput("transpose_data", "Transpose",value = FALSE)
+            # ,
+            # helpText("Check this box if your variables are in rows instead of columns.")
+          )
         )
+        
+        # radioButtons("filetype", "Select file type:",
+        #              choices = c("CSV" = "csv",
+        #                          "Excel" = "excel"),
+        #              inline =T),
+        # fileInput("datafiles", 
+        #           label = h4("data File"),
+        #           accept =  c("text/csv",
+        #                       "application/vnd.ms-excel",
+        #                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        #                       ".xls",".xlsx")
+        #   ),
+        # # fluidRow pour la gestion des format 
+        # fluidRow(
+        #   conditionalPanel("input.filetype == 'csv'",
+        #     column(6,
+        #            textInput("dec", 
+        #                      'character for decimal point', 
+        #                      value = ".")
+        #            ),
+        #     column(6,
+        #       textInput("NAstring", 
+        #                 label = "character for missing value", 
+        #                 value = "NA")
+        #     )
+        #   )
+        # ),
+        # 
+        # fluidRow(
+        #   conditionalPanel(
+        #     condition = "input.filetype == 'csv'",
+        #     radioButtons('sep', 'Separator',
+        #                  c(Comma=',', Semicolon=';', Tab='\t'),
+        #                  inline = TRUE ) 
+        #   ),
+        #   fluidRow(
+        #     conditionalPanel(
+        #       condition = "input.filetype == 'excel'",
+        #       column(6,
+        #              numericInput("skipn",label = "number of lines to skip",value = 0)
+        #       ),
+        #       column(6,
+        #              numericInput("sheetn",label = "sheet",value = 1)
+        #       )
+        #     )
+        #   )
+        # ),
+        # 
+        # hr(),
+        # br(nrow = 2),
+        # checkboxInput("transpose","Transpose the table",FALSE),
+        # checkboxInput("zeroegalNA","consider 0 as NA",FALSE) ,
+        # actionButton("confirmdatabutton","Confirm data", 
+        #              style = "background-color: blue;
+        #                         color: white;
+        #                         border-color: blue;")
+        
+      )# 
+    ),
+    
+    # Show a plot of the generated distribution
+    mainPanel(
+      conditionalPanel( condition = "!output.Uploadfile",
+                        h3("The purpose of this application is to provide a user-friendly tool for generating multiple train cuts/validations from omics data.",
+                           align="center"),
+                        fluidRow(column(6,imageOutput("image1")),
+                                 column(2,imageOutput("image2"))),
+                        br(),
+                        h4("This application is developped in the 12th team of I2MC for internal used.",align="center")
+      ), 
+      conditionalPanel(condition = "output.Uploadfile", 
+                       tabsetPanel(id = 'tab_split', 
+                                   tabPanel( "DATA",
+                                             icon = icon("table"),
+                                             fluidRow(
+                                               box(
+                                                 title = "Data overview",
+                                                 status = "info",
+                                                 solidHeader = TRUE,
+                                                 width = 12,
+                                                 DTOutput("data_preview") %>% withSpinner(color="#0dc5c1",
+                                                                                          type = 1)
+                                               )
+                                             )
+                                   ),
+                                   tabPanel( "SPLITS",
+                                             icon = icon("scissors"),
+                                             # fluidPage(
+                                             #   tags$head(
+                                             #     tags$style(
+                                             #       HTML("
+                                             #         #generation_log {
+                                             #           color : gray;
+                                             #           background-color : #F0F8FF;
+                                             #           font-family : 'Courier New', Courier, monospace;
+                                             #           font-size : 12px;
+                                             #         }
+                                             #       ")
+                                             #     )
+                                             #   )
+                                             # ), 
+                                             fluidRow(
+                                               box(
+                                                 title = "Parametrs of split",
+                                                 status = "warning",
+                                                 solidHeader = TRUE,
+                                                 width = 6,
+                                                 selectInput("target_col", "Classification variable (target/label) :",
+                                                             choices = NULL),
+                                                 sliderInput("train_ratio", " Train size (%) :",
+                                                             min = 50, max = 95, value = 70, step = 1),
+                                                 numericInput("n_splits", "Number of splits :",
+                                                              value = 15, min = 1, max = 100, step = 1),
+                                                 
+                                                 hr(),
+                                                 #br(nrow =2),
+                                                 uiOutput('get_clinivars')
+                                                 # shinyjs::disable(
+                                                 # numericInput("base_seed", "Base random seed :",
+                                                 #                             value = 123, min = 1, max = 10000)
+                                                 #) ,
+                                                 #helpText("N seeds will be generated: base_seed, base_seed+1, ..., base_seed+N-1")
+                                               ),
+                                               box(
+                                                 title = "Data information",
+                                                 status = "success",
+                                                 solidHeader = TRUE,
+                                                 height = 6,
+                                                 width = 6,
+                                                 verbatimTextOutput("data_info")
+                                               )
+                                             ),
+                                             fluidRow(
+                                               box(
+                                                 title = "Generate splits",
+                                                 status = "primary",
+                                                 solidHeader = TRUE,
+                                                 width = 6,
+                                                 actionButton("generate_btn", "Générer les splits",
+                                                              icon = icon("play"),
+                                                              class = "btn-success btn-lg"),
+                                                 hr(),
+                                                 verbatimTextOutput("generation_log")
+                                               )
+                                             )
+                                             
+                                   ),
+                                   tabPanel("DOWNLOAD",
+                                            icon = icon("download"),
+                                            fluidRow(
+                                              box(
+                                                title = "Downloading files",
+                                                status = "success",
+                                                solidHeader = TRUE,
+                                                width = 12,
+                                                uiOutput("download_buttons"),
+                                                hr(),
+                                                helpText("Each Excel file contains three sheets: Train, Validation, and Statistics.")
+                                              )
+                                            )
+                                   )
+                       )
+      )
     )
+  )
 )
 
 
@@ -854,7 +854,7 @@ server <- function(input, output, session) {
     input$csv_dec
     input$csv_na
     input$transpose_data
-    }, {
+  }, {
     #input$load_btn, {
     req(input$file)
     req(input$csv_dec, input$csv_sep)
@@ -1126,24 +1126,3 @@ server <- function(input, output, session) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
-
-
-#* l'application contient deja une partie selection de variable par la methode unuivarié (mann-whitney et test de student ) sur le train set 
-#* on va rajouter de nouvelle methode de slection de variable multivariée : regularisation Cox , lasso et elasticnet 
-#* on va donner à l'utilisateur la possibilité de choisir la methode de selection de variable et les paramterre lambda et alpha des methode de resularisation 
-#* dans la partie ajustement des modeles "model", on va rajouter des modeles, en plus du modele de SVM et RF , un modele tel que le modele de 
-#* regrssoion logistique penalisee (elasticnet) pour la classification binaire
-
-# autre chose :  
-# - on va aussi donner l'utilisateur la possibilité de parametre ses modele (hyperparametre)
-#* pour un modele données choisi par l'utiisateur : on afficher apres tuning, les hyperparametres optimal dans le train
-# 
-# il faudra afficher dans UI apres tuning des hypermetres , les hyperparametre optimal pour modele choisi ceci 
-# permet de guider l'utilisateur 
-# modele à  tuner
-# tuneRF {randomForest} 
-# tune.svm(x, y = NULL, data = NULL, degree = NULL, gamma = NULL, coef0 = NULL,
-         # cost = NULL, nu = NULL, class.weights = NULL, epsilon = NULL, ...)
-
-# apres avoir trouvé les parametre optimaux du modele dans le train , on doit avoir la possibilité dans la partie inteface de c=re reajuster le modele avec ces nouveau hyperaametre optimaux 
-
