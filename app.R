@@ -236,20 +236,11 @@ create_split <- function(data,
     stop(paste("Colonnes manquantes:", paste(missing_cols, collapse = ", ")))
   }
   
-  # Vérifier train_ratio
   if (train_ratio <= 0 || train_ratio >= 1) {
     stop("train_ratio doit être entre 0 et 1")
   }
   
-  # --------------------------------------------------------------------------
-  # 2. CRÉER UNE COPIE DES DONNÉES (pour ne pas modifier l'original)
-  # --------------------------------------------------------------------------
-  
   data_work <- data
-  
-  # --------------------------------------------------------------------------
-  # 3. DISCRÉTISER LES VARIABLES CONTINUES
-  # --------------------------------------------------------------------------
   
   # Discrétiser age si spécifié et si c'est numérique
   if (!is.null(age_col) && is.numeric(data_work[[age_col]])) {
@@ -1179,8 +1170,8 @@ server <- function(input, output, session) {
                     sex_col = sex_col,
                     age_col = age_col,
                     gfr_col = gfr_col,
-                    n_age_bins = input$n_age_bins,
-                    n_gfr_bins = input$n_gfr_bins,
+                    n_age_bins = 4, #input$n_age_bins,
+                    n_gfr_bins = 4, #input$n_gfr_bins,
                     seed = seed
                   )
         
@@ -1319,13 +1310,14 @@ server <- function(input, output, session) {
         condition = sprintf("input['%s']", "use_age"),
         selectInput("age_col", "Colonne Âge:",
           choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
-        ),
-        sliderInput( "n_age_bins", "Nombre de groupes d'âge:",
-          min = 2,
-          max = 10,
-          value = 4,
-          step = 1
         )
+        ,
+        # sliderInput( "n_age_bins", "Nombre de groupes d'âge:",
+        #   min = 2,
+        #   max = 10,
+        #   value = 4,
+        #   step = 1
+        # )
       ),
       
       # GFR (optionnel)
@@ -1334,13 +1326,14 @@ server <- function(input, output, session) {
       conditionalPanel(
         condition = sprintf("input['%s']", "use_gfr"),
         selectInput( "gfr_col","Colonne GFR:", choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
-        ),
-        sliderInput("n_gfr_bins", "Nombre de groupes de GFR:",
-          min = 2,
-          max = 10,
-          value = 4,
-          step = 1
         )
+        # ,
+        # sliderInput("n_gfr_bins", "Nombre de groupes de GFR:",
+        #   min = 2,
+        #   max = 10,
+        #   value = 4,
+        #   step = 1
+        # )
       )
     )
   })
