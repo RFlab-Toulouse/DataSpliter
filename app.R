@@ -240,6 +240,16 @@ create_split <- function(data,
     stop("train_ratio doit être entre 0 et 1")
   }
   
+  if(!is.null(sex_col)){
+    verif_sex = ifelse(is.numeric(data[[sex_col]]), "yes", "no")
+    cat(" c'est un  integer \n")
+    if(verif_sex =="yes"){
+      cat('on est dans la sauce\n')
+      data[[sex_col]] = as.factor(data[[sex_col]])
+    }
+  }
+  
+  
   data_work <- data
   
   # Discrétiser age si spécifié et si c'est numérique
@@ -991,12 +1001,15 @@ server <- function(input, output, session) {
   data_loaded <- reactiveVal(NULL)
   splits_generated <- reactiveVal(NULL)
   
+  update_sex = reactiveVal(FALSE)
+  
   # Charger les données avec le bouton
   observeEvent({input$file
     input$csv_sep
     input$csv_dec
     input$csv_na
     input$transpose_data
+    #input$sex_col
   }, {
     #input$load_btn, {
     req(input$file)
@@ -1066,6 +1079,8 @@ server <- function(input, output, session) {
         
         data <- data_t
       }
+      
+      
       # if (input$transpose_data) {
       #   # Sauvegarder les noms de colonnes comme première colonne
       #   first_col <- colnames(data)
@@ -1284,7 +1299,7 @@ server <- function(input, output, session) {
     req(data_loaded())
     data <- data_loaded()
     cols_to_consider = names(data)[sapply(data, function(x) is.factor(x)  | is.character(x) | is.numeric(x))]
-    final_cols = cols_to_consider[!grepl(pattern = "\\d$", cols_to_consider)]
+    final_cols = cols_to_consider[!grepl(pattern = "^\\d", cols_to_consider)]
      
     # Exclure la variable cible des options
     choices <- setdiff(names(data), input$target_col)
@@ -1296,11 +1311,7 @@ server <- function(input, output, session) {
       
       conditionalPanel(
         condition = sprintf("input['%s']", "use_sex"),
-        selectInput(
-          "sex_col",
-          "Colonne Sexe:",
-          choices = final_cols
-        )
+        selectInput( "sex_col", "Colonne Sexe:",  choices = final_cols)
       ),
       
       # Age (optionnel)
