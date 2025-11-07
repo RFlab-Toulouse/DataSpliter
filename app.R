@@ -204,47 +204,193 @@ calculate_descriptive_stats <- function(data, target_col, clinic_vars = NULL) {
 # }
 
 #' Créer un split train/validation
-create_split <- function(data, train_ratio = 0.7, target_col, seed = NULL) {
+create_split <- function(data, 
+                         train_ratio = 0.7,
+                         target_col,
+                         sex_col = NULL,
+                         age_col = NULL,
+                         gfr_col = NULL,
+                         n_age_bins = 4,
+                         n_gfr_bins = 4,
+                         seed = NULL) {
+  
+  # --------------------------------------------------------------------------
+  # 1. VALIDATION DES ENTRÉES
+  # --------------------------------------------------------------------------
+  
   if (!is.null(seed)) {
     set.seed(seed)
   }
   
+  # Vérifier que target_col existe
   if (!target_col %in% names(data)) {
-    stop(paste("the column ", target_col, " does not exist in the data frame"))
+    stop(paste("La colonne", target_col, "n'existe pas dans les données"))
   }
   
-  target_values <- data[[target_col]]
-  unique_classes <- unique(target_values)
+  # Vérifier les autres colonnes si spécifiées
+  cols_to_check <- c(sex_col, age_col, gfr_col)
+  cols_to_check <- cols_to_check[!is.null(cols_to_check)]
   
+  missing_cols <- setdiff(cols_to_check, names(data))
+  if (length(missing_cols) > 0) {
+    stop(paste("Colonnes manquantes:", paste(missing_cols, collapse = ", ")))
+  }
+  
+  # Vérifier train_ratio
+  if (train_ratio <= 0 || train_ratio >= 1) {
+    stop("train_ratio doit être entre 0 et 1")
+  }
+  
+  # --------------------------------------------------------------------------
+  # 2. CRÉER UNE COPIE DES DONNÉES (pour ne pas modifier l'original)
+  # --------------------------------------------------------------------------
+  
+  data_work <- data
+  
+  # --------------------------------------------------------------------------
+  # 3. DISCRÉTISER LES VARIABLES CONTINUES
+  # --------------------------------------------------------------------------
+  
+  # Discrétiser age si spécifié et si c'est numérique
+  if (!is.null(age_col) && is.numeric(data_work[[age_col]])) {
+    data_work$age_bin_temp <- cut(
+      data_work[[age_col]], 
+      breaks = quantile(data_work[[age_col]], 
+                        probs = seq(0, 1, length.out = n_age_bins + 1),
+                        na.rm = TRUE),
+      include.lowest = TRUE,
+      labels = paste0("age_Q", 1:n_age_bins)
+    )
+  } else if (!is.null(age_col)) {
+    # Si age est déjà catégoriel, l'utiliser directement
+    data_work$age_bin_temp <- data_work[[age_col]]
+  }
+  
+  # Discrétiser gfr si spécifié et si c'est numérique
+  if (!is.null(gfr_col) && is.numeric(data_work[[gfr_col]])) {
+    data_work$gfr_bin_temp <- cut(
+      data_work[[gfr_col]], 
+      breaks = quantile(data_work[[gfr_col]], 
+                        probs = seq(0, 1, length.out = n_gfr_bins + 1),
+                        na.rm = TRUE),
+      include.lowest = TRUE,
+      labels = paste0("gfr_Q", 1:n_gfr_bins)
+    )
+  } else if (!is.null(gfr_col)) {
+    # Si gfr est déjà catégoriel, l'utiliser directement
+    data_work$gfr_bin_temp <- data_work[[gfr_col]]
+  }
+  
+  # --------------------------------------------------------------------------
+  # 4. CRÉER LA VARIABLE DE STRATIFICATION COMBINÉE
+  # --------------------------------------------------------------------------
+  
+  strata_components <- list(data_work[[target_col]])
+  
+  if (!is.null(sex_col)) {
+    strata_components <- c(strata_components, list(data_work[[sex_col]]))
+  }
+  
+  if (!is.null(age_col)) {
+    strata_components <- c(strata_components, list(data_work$age_bin_temp))
+  }
+  
+  if (!is.null(gfr_col)) {
+    strata_components <- c(strata_components, list(data_work$gfr_bin_temp))
+  }
+  
+  # Combiner toutes les variables en une seule strate
+  strata <- do.call(paste, c(strata_components, sep = "_"))
+  
+  # --------------------------------------------------------------------------
+  # 5. CRÉER LES INDICES TRAIN/VALIDATION PAR STRATE
+  # --------------------------------------------------------------------------
   
   train_indices <- c()
-  for (class in unique_classes) {
-    class_indices <- which(target_values == class)
-    n_class <- length(class_indices)
+  unique_strata <- unique(strata)
+  
+  for (stratum in unique_strata) {
+    stratum_indices <- which(strata == stratum)
+    n_stratum <- length(stratum_indices)
     
-    n_train_class <- floor(n_class * train_ratio)
-    if (n_train_class == 0 && n_class > 0) {
-      n_train_class <- 1
+    # Calculer le nombre d'observations pour train
+    n_train_stratum <- floor(n_stratum * train_ratio)
+    
+    # S'assurer d'avoir au moins 1 observation en train si la strate n'est pas vide
+    if (n_train_stratum == 0 && n_stratum > 0) {
+      n_train_stratum <- 1
     }
     
-    if (n_train_class > 0 && n_train_class < n_class) {
-      train_class_indices <- sample(class_indices, size = n_train_class)
-      train_indices <- c(train_indices, train_class_indices)
-    } else if (n_train_class >= n_class) {
-      if (n_class > 1) {
-        train_class_indices <- sample(class_indices, size = n_class - 1)
-        train_indices <- c(train_indices, train_class_indices)
-      }
+    # S'assurer d'avoir au moins 1 observation en validation si possible
+    if (n_train_stratum >= n_stratum && n_stratum > 1) {
+      n_train_stratum <- n_stratum - 1
+    }
+    
+    # Échantillonner aléatoirement dans la strate
+    if (n_train_stratum > 0 && n_train_stratum < n_stratum) {
+      train_stratum_indices <- sample(stratum_indices, size = n_train_stratum)
+      train_indices <- c(train_indices, train_stratum_indices)
+    } else if (n_train_stratum > 0) {
+      # Si tous les indices vont en train (strate trop petite)
+      train_indices <- c(train_indices, stratum_indices)
     }
   }
   
+  # Créer les indices de validation
   validation_indices <- setdiff(1:nrow(data), train_indices)
+  
+  # --------------------------------------------------------------------------
+  # 6. RETOURNER LES SPLITS
+  # --------------------------------------------------------------------------
   
   list(
     train = data[train_indices, ],
     validation = data[validation_indices, ]
   )
 }
+
+
+# create_split <- function(data, train_ratio = 0.7, target_col, seed = NULL) {
+#   if (!is.null(seed)) {
+#     set.seed(seed)
+#   }
+#   
+#   if (!target_col %in% names(data)) {
+#     stop(paste("the column ", target_col, " does not exist in the data frame"))
+#   }
+#   
+#   target_values <- data[[target_col]]
+#   unique_classes <- unique(target_values)
+#   
+#   
+#   train_indices <- c()
+#   for (class in unique_classes) {
+#     class_indices <- which(target_values == class)
+#     n_class <- length(class_indices)
+#     
+#     n_train_class <- floor(n_class * train_ratio)
+#     if (n_train_class == 0 && n_class > 0) {
+#       n_train_class <- 1
+#     }
+#     
+#     if (n_train_class > 0 && n_train_class < n_class) {
+#       train_class_indices <- sample(class_indices, size = n_train_class)
+#       train_indices <- c(train_indices, train_class_indices)
+#     } else if (n_train_class >= n_class) {
+#       if (n_class > 1) {
+#         train_class_indices <- sample(class_indices, size = n_class - 1)
+#         train_indices <- c(train_indices, train_class_indices)
+#       }
+#     }
+#   }
+#   
+#   validation_indices <- setdiff(1:nrow(data), train_indices)
+#   
+#   list(
+#     train = data[train_indices, ],
+#     validation = data[validation_indices, ]
+#   )
+# }
 
 # create_split <- function(data, train_ratio = 0.7, seed = NULL) {
 #   if (!is.null(seed)) {
@@ -585,7 +731,6 @@ ui <- fluidPage(
   # tags$head(
   #   tags$img(height = "100px" , width = "100px", src = "pictures/cut-out.jpg")
   # ),
-  br(nrow = 1),
   hr(),
   sidebarLayout(
     sidebarPanel(
@@ -597,6 +742,7 @@ ui <- fluidPage(
             status = "primary",
             solidHeader = TRUE,
             width = 12,
+            background = "purple",
             radioButtons("file_type",label =  "Type of file :",
                          choices = c("CSV" = "csv", "Excel" = "excel"),
                          selected = "csv",
@@ -757,7 +903,7 @@ ui <- fluidPage(
                                                  title = "Parametrs of split",
                                                  status = "warning",
                                                  solidHeader = TRUE,
-                                                 width = 6,
+                                                 width = 3,
                                                  selectInput("target_col", "Classification variable (target/label) :",
                                                              choices = NULL),
                                                  sliderInput("train_ratio", " Train size (%) :",
@@ -768,11 +914,17 @@ ui <- fluidPage(
                                                  hr(),
                                                  #br(nrow =2),
                                                  uiOutput('get_clinivars')
-                                                 # shinyjs::disable(
+                                                
                                                  # numericInput("base_seed", "Base random seed :",
                                                  #                             value = 123, min = 1, max = 10000)
-                                                 #) ,
                                                  #helpText("N seeds will be generated: base_seed, base_seed+1, ..., base_seed+N-1")
+                                               ),
+                                               box(
+                                                 width = 3,
+                                                 title = "startifcation Varaibles",
+                                                 status = "warning",
+                                                 solidHeader = TRUE,
+                                                 uiOutput("stratified_vars_ui")
                                                ),
                                                box(
                                                  title = "Data information",
@@ -1016,7 +1168,21 @@ server <- function(input, output, session) {
         
         seed <- base_seed + i - 1
         #split_data <- create_split(data, train_ratio, seed)
-        split_data <- create_split(data, train_ratio, target_col, seed) 
+        #split_data <- create_split(data, train_ratio, target_col, seed) 
+        sex_col <- if (input$use_sex) input$sex_col else NULL
+        age_col <- if (input$use_age) input$age_col else NULL
+        gfr_col <- if (input$use_gfr) input$gfr_col else NULL
+        split_data <-  create_split(
+                    data = data,
+                    train_ratio = train_ratio,
+                    target_col = input$target_col,
+                    sex_col = sex_col,
+                    age_col = age_col,
+                    gfr_col = gfr_col,
+                    n_age_bins = input$n_age_bins,
+                    n_gfr_bins = input$n_gfr_bins,
+                    seed = seed
+                  )
         
         # Nom du fichier
         file_name <- sprintf("split_%02d.xlsx", i)
@@ -1122,6 +1288,62 @@ server <- function(input, output, session) {
       zip(file, files_to_zip, flags = "-j")
     }
   )
+  
+  output$stratified_vars_ui <- renderUI({
+    req(data_loaded())
+    data <- data_loaded()
+    cols_to_consider = names(data)[sapply(data, function(x) is.factor(x)  | is.character(x) | is.numeric(x))]
+    final_cols = cols_to_consider[!grepl(pattern = "\\d$", cols_to_consider)]
+     
+    # Exclure la variable cible des options
+    choices <- setdiff(names(data), input$target_col)
+    
+    fluidRow(
+      
+      # Sex (optionnel)
+      checkboxInput("use_sex","Stratifier sur le Sexe", value = FALSE),
+      
+      conditionalPanel(
+        condition = sprintf("input['%s']", "use_sex"),
+        selectInput(
+          "sex_col",
+          "Colonne Sexe:",
+          choices = final_cols
+        )
+      ),
+      
+      # Age (optionnel)
+      checkboxInput("use_age","Stratifier sur l'Âge", value = FALSE),
+      
+      conditionalPanel(
+        condition = sprintf("input['%s']", "use_age"),
+        selectInput("age_col", "Colonne Âge:",
+          choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
+        ),
+        sliderInput( "n_age_bins", "Nombre de groupes d'âge:",
+          min = 2,
+          max = 10,
+          value = 4,
+          step = 1
+        )
+      ),
+      
+      # GFR (optionnel)
+      checkboxInput("use_gfr", "Stratifier sur le GFR", value = FALSE),
+      
+      conditionalPanel(
+        condition = sprintf("input['%s']", "use_gfr"),
+        selectInput( "gfr_col","Colonne GFR:", choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
+        ),
+        sliderInput("n_gfr_bins", "Nombre de groupes de GFR:",
+          min = 2,
+          max = 10,
+          value = 4,
+          step = 1
+        )
+      )
+    )
+  })
 }
 
 # Run the application 
