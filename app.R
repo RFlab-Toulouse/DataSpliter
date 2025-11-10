@@ -1322,19 +1322,19 @@ server <- function(input, output, session) {
     fluidRow(
       
       # Sex (optionnel)
-      checkboxInput("use_sex","Stratifier sur le Sexe", value = FALSE),
+      checkboxInput("use_sex","Stratify by sex", value = FALSE),
       
       conditionalPanel(
         condition = sprintf("input['%s']", "use_sex"),
-        selectInput( "sex_col", "Colonne Sexe:",  choices = final_cols)
+        selectInput( "sex_col", "Sex Column:",  choices = final_cols)
       ),
       
       # Age (optionnel)
-      checkboxInput("use_age","Stratifier sur l'Âge", value = FALSE),
+      checkboxInput("use_age","Stratify by age", value = FALSE),
       
       conditionalPanel(
         condition = sprintf("input['%s']", "use_age"),
-        selectInput("age_col", "Colonne Âge:",
+        selectInput("age_col", "Age column:",
           choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
         )
         ,
@@ -1347,11 +1347,11 @@ server <- function(input, output, session) {
       ),
       
       # GFR (optionnel)
-      checkboxInput("use_gfr", "Stratifier sur le GFR", value = FALSE),
+      checkboxInput("use_gfr", "Stratify by eGFR", value = FALSE),
       
       conditionalPanel(
         condition = sprintf("input['%s']", "use_gfr"),
-        selectInput( "gfr_col","Colonne GFR:", choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
+        selectInput( "gfr_col","eGFR column:", choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
         )
         # ,
         # sliderInput("n_gfr_bins", "Nombre de groupes de GFR:",
