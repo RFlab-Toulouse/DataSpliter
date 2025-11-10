@@ -242,9 +242,9 @@ create_split <- function(data,
   
   if(!is.null(sex_col)){
     verif_sex = ifelse(is.numeric(data[[sex_col]]), "yes", "no")
-    cat(" c'est un  integer \n")
+    #cat(" c'est un  integer \n")
     if(verif_sex =="yes"){
-      cat('on est dans la sauce\n')
+      #cat('on est dans la sauce\n')
       data[[sex_col]] = as.factor(data[[sex_col]])
     }
   }
@@ -1108,17 +1108,32 @@ server <- function(input, output, session) {
     })
   })
   
-  output$get_clinivars =  renderUI({
+  output$get_clinivars <- renderUI({
     req(data_loaded())
+    
     cols_to_remove <- colnames(data_loaded())[grepl('^\\d+$', colnames(data_loaded()))]
     
     filtered_data <- data_loaded()[, !colnames(data_loaded()) %in% cols_to_remove]
     
-    selectInput("clinicalvars", label = "Choose clinical variables (statistics) : ", 
-                choices = names(filtered_data)[sapply(filtered_data, function(c) is.numeric(x) | is.factor(x) | is.character(x) )],
-                multiple = TRUE
-    )
-  })
+    numbers_rows <- nrow(filtered_data)
+    
+    # conditionalPanel(
+    #   condition = "output.number_rows > 0", 
+      selectInput("clinicalvars", label = "Choose clinical variables (statistics):", 
+                  choices = names(filtered_data)[sapply(filtered_data, function(x) is.numeric(x) | is.factor(x) | is.character(x))],
+                  multiple = TRUE)
+    #)
+ })
+  
+  # output$number_rows <- reactive({
+  #   req(data_loaded())
+  #   
+  #   cols_to_remove <- colnames(data_loaded())[grepl('^\\d+$', colnames(data_loaded()))]
+  #   
+  #   filtered_data <- data_loaded()[, !colnames(data_loaded()) %in% cols_to_remove]
+  #   nrow(filtered_data)
+  # })
+  # 
   
   # Aperçu des données
   output$data_preview <- renderDT({
