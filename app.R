@@ -25,16 +25,125 @@ library(dplyr)
 library(ggplot2)
 library(gtsummary)
 
+confirmdata<-function(toto){
+  toto<-as.data.frame(toto)
+  toto[,1]<-as.factor(as.character(toto[,1]))
+  for (i in 2:ncol(toto)){
+    toto[,i]<-as.numeric(as.character(toto[,i]))
+  }
+  return(toto)
+}
+
+importfunction<-function(importparameters){
+  previousparameters<-NULL
+  validation<-NULL
+  learning<-NULL
+  
+  if(is.null(importparameters$file) & is.null(importparameters$modelfile)){return()}
+  
+  if(!is.null(importparameters$file)  ){
+    datapath<- importparameters$file$datapath
+    learning<-importfile(datapath = datapath,
+                         extension = importparameters$extension
+                         ,NAstring=NULL, #importparameters$NAstring,
+                         sheet=importparameters$sheetn,
+                         skiplines=importparameters$skipn,
+                         dec=importparameters$dec,
+                         sep=importparameters$sep)
+    
+    learning<-transformdata(toto = learning,
+                            transpose=importparameters$transpose
+                            )
+    
+  
+      learning<-confirmdata(toto = learning)
+  }
+  
+  res<-list("learning"=learning,previousparameters=previousparameters)
+  return(res)
+}
+
+importfile <- function (datapath,extension,NAstring="NA",sheet=1,skiplines=0,dec=".",sep=","){
+  if(extension=="csv"){
+    toto <<- read.csv2(datapath,header = F,sep =sep,dec=dec,na.strings = NAstring,stringsAsFactors = F,row.names=NULL,check.names = F )
+  }
+  if(extension=="excel"){
+    options(warn=-1)
+    filerm<<-file.rename(datapath,paste(datapath, ".xlsx", sep=""))
+    options(warn=0)
+    toto <<-readxl:::read_excel(paste(datapath, ".xlsx", sep=""),
+                                na=NAstring,col_names = F,
+                                skip = skiplines,
+                                sheet = sheet) %>% as.data.frame()
+  }
+  if(length(which(apply(X = toto,MARGIN=2,function(x){sum(is.na(x))})==nrow(toto)))!=0){
+    toto<-toto[,-which(apply(X = toto,MARGIN=2,function(x){sum(is.na(x))})==nrow(toto))]}
+  if(length(which(apply(X = toto,MARGIN=1,function(x){sum(is.na(x))})==ncol(toto)))!=0){
+    toto<-toto[-which(apply(X = toto,MARGIN=1,function(x){sum(is.na(x))})==ncol(toto)),]}
+  print(class(toto))
+  
+  rnames<-as.character(as.matrix(toto[,1]))
+  cnames<-as.character(as.matrix(toto[1,]))
+  toto<-toto[,-1]
+  toto<-toto[-1,]
+  row.names(toto)<-rnames[-1]
+  colnames(toto)<-cnames[-1]
+  
+  toto<-as.data.frame(toto)
+  rownames(toto)<-rnames[-1]
+  colnames(toto)<-cnames[-1]
+  return(toto)
+}
+
+
 # transformdata<-function(toto,transpose){
 #   if(transpose){
 #     toto<-t(toto)
 #     toto<-as.data.frame(toto[,c(colnames(toto)[1],sort(colnames(toto)[-1]))], stringsAsFactors = F)
 #     colnames(toto)<-toto[1,]
 #     toto <- toto[-1,]
-#     
+# 
 #   }
 #   return(toto)
 # }
+
+
+# transformdata <- function(toto, transpose) {
+#   if(transpose) {
+#     # Transposer directement en data.table (plus rapide)
+#     toto <- data.table::transpose(toto, keep.names = "Variable")
+#     
+#     # Utiliser la première ligne comme noms de colonnes
+#     if(nrow(toto) > 0) {
+#       colnames(toto) <- as.character(toto[1, ])
+#       toto <- toto[-1, ]
+#     }
+#   }
+#   return(toto)
+# }
+transformdata <- function(toto, transpose) {
+  if(transpose) {
+    # Simple transposition (comme l'ancien code)
+    toto <- t(toto)
+    
+    # Conversion en data.frame uniquement à la fin
+    toto <- as.data.frame(toto, stringsAsFactors = FALSE)
+    
+    # Utiliser la première ligne comme noms de colonnes
+    if(nrow(toto) > 0) {
+      colnames(toto) <- as.character(toto[1, ])
+      toto <- toto[-1, ]
+    }
+    
+    # Conversion automatique des colonnes numériques (optionnel et rapide)
+    toto[] <- lapply(toto, function(x) {
+      num_x <- suppressWarnings(as.numeric(as.character(x)))
+      if(sum(!is.na(num_x)) / length(x) > 0.8) num_x else x
+    })
+  }
+  
+  return(toto)
+}
 
 # 
 # transformdata <- function(toto, transpose) {
@@ -69,33 +178,73 @@ library(gtsummary)
 #   return(toto)
 # }
 
-transformdata <- function(toto, transpose) {
-  if(transpose) {
-    toto <- t(toto)
-    toto <- as.data.frame(toto[, c(colnames(toto)[1], sort(colnames(toto)[-1]))], 
-                          stringsAsFactors = FALSE)
-    
-    colnames(toto) <- toto[1, ]
-    toto <- toto[-1, ]
-    
-    is_numeric_column <- function(x) {
-      x_clean <- x[!is.na(x) & x != ""]
-      
-      if(length(x_clean) == 0) return(FALSE)
-      
-      x_num <- suppressWarnings(as.numeric(x_clean))
-      
-      return(sum(!is.na(x_num)) / length(x_clean) > 0.8)
-    }
-    
-    for(col in names(toto)) {
-      if(is_numeric_column(toto[[col]])) {
-        toto[[col]] <- as.numeric(toto[[col]])
-      }
-    }
-  }
-  return(toto)
-}
+# transformdata <- function(toto, transpose) {
+#   if(transpose) {
+#     toto <- t(toto)
+#     toto <- as.data.frame(toto[, c(colnames(toto)[1], sort(colnames(toto)[-1]))], 
+#                           stringsAsFactors = FALSE)
+#     
+#     colnames(toto) <- toto[1, ]
+#     toto <- toto[-1, ]
+#     
+#     is_numeric_column <- function(x) {
+#       x_clean <- x[!is.na(x) & x != ""]
+#       
+#       if(length(x_clean) == 0) return(FALSE)
+#       
+#       x_num <- suppressWarnings(as.numeric(x_clean))
+#       
+#       return(sum(!is.na(x_num)) / length(x_clean) > 0.8)
+#     }
+#     
+#     for(col in names(toto)) {
+#       if(is_numeric_column(toto[[col]])) {
+#         toto[[col]] <- as.numeric(toto[[col]])
+#       }
+#     }
+#   }
+#   return(toto)
+# }
+
+library(data.table)
+
+# transformdata <- function(toto, transpose) {
+#   if(transpose) {
+#     # Transposition
+#     toto <- t(toto)
+#     toto <- as.data.frame(toto[, c(colnames(toto)[1], sort(colnames(toto)[-1]))], 
+#                           stringsAsFactors = FALSE)
+#     
+#     # Utiliser la première ligne comme noms de colonnes
+#     colnames(toto) <- toto[1, ]
+#     toto <- toto[-1, ]
+#     
+#     #  OPTIMISATION : Conversion vectorisée en une seule passe
+#     toto[] <- lapply(toto, function(x) {
+#       # Nettoyer les valeurs
+#       x_clean <- x[!is.na(x) & x != ""]
+#       
+#       # Si colonne vide, retourner telle quelle
+#       if(length(x_clean) == 0) return(x)
+#       
+#       # Essayer la conversion (UNE SEULE FOIS)
+#       x_num <- suppressWarnings(as.numeric(x))
+#       
+#       # Vérifier si la conversion est réussie (>80% de valeurs converties)
+#       valid_conversions <- sum(!is.na(x_num)) / length(x_clean)
+#       
+#       # Retourner numérique si valide, sinon retourner l'original
+#       if(valid_conversions > 0.8) {
+#         return(x_num)
+#       } else {
+#         return(x)
+#       }
+#     })
+#   }
+#   return(toto)
+# }
+
+
 
 #' Calculer les statistiques descriptives pour les variables cliniques
 #' #' Retourne un format "mean +/- sd" pour chaque variable
@@ -149,6 +298,7 @@ calculate_descriptive_stats <- function(data, target_col, clinic_vars = NULL) {
   
   return(stats_list)
 }
+
 # calculate_descriptive_stats <- function(data, target_col) {
 #   
 #   # Séparer les variables numériques et catégorielles
@@ -769,7 +919,7 @@ ui <- fluidPage(
               condition = "input.file_type == 'csv'",
               fluidRow(
                 column(5,
-                       selectInput("csv_sep", "Séparateur :",
+                       selectInput("sep", "Séparateur :",
                                    choices = c("Virgule (,)" = ",",
                                                "Point-virgule (;)" = ";",
                                                "Tabulation" = "\t",
@@ -778,7 +928,7 @@ ui <- fluidPage(
                 ),
                 column(
                   width = 5, 
-                  selectInput("csv_dec", "Caractère décimal :",
+                  selectInput("dec", "Caractère décimal :",
                               choices = c("Point (.)" = ".",
                                           "Virgule (,)" = ","),
                               selected = ".")
@@ -792,8 +942,26 @@ ui <- fluidPage(
                            
                            ")
               #Séparez plusieurs chaînes par des virgules (ex: NA,vide,NULL)
+            ),
+            conditionalPanel(
+              condition = "input.file_type == 'excel'", 
+              fluidRow(  
+                column(6,
+                       numericInput("skipn", 
+                                    label = "Number of lines to skip", 
+                                    value = 0, 
+                                    min = 0)
+                ),
+                column(6,
+                       numericInput("sheetn", 
+                                    label = "Sheet number", 
+                                    value = 1, 
+                                    min = 1, 
+                                    max = 100)
+                )
+              )
             )
-            ,checkboxInput("transpose_data", "Transpose",value = FALSE)
+            ,checkboxInput("transpose", "Transpose",value = FALSE)
             # ,
             # helpText("Check this box if your variables are in rows instead of columns.")
           )
@@ -878,7 +1046,7 @@ ui <- fluidPage(
                                                  status = "info",
                                                  solidHeader = TRUE,
                                                  width = 12,
-                                                 DTOutput("data_preview") %>% withSpinner(color="#0dc5c1",
+                                                 dataTableOutput ("data_preview") %>% withSpinner(color="#0dc5c1",
                                                                                           type = 1)
                                                )
                                              )
@@ -905,8 +1073,15 @@ ui <- fluidPage(
                                                  status = "warning",
                                                  solidHeader = TRUE,
                                                  width = 3,
-                                                 selectInput("target_col", "Classification variable (target/label) :",
-                                                             choices = NULL),
+                                                 # selectInput("target_col", "Classification variable (target/label) :",
+                                                 #             choices = NULL),
+                                                 selectizeInput("target_col", 
+                                                                "Classification variable (target/label) :",
+                                                                choices = NULL,
+                                                                options = list(
+                                                                  placeholder = 'Select a variable',
+                                                                  maxOptions = 5000  # Limite d'affichage
+                                                                )),
                                                  sliderInput("train_ratio", " Train size (%) :",
                                                              min = 50, max = 95, value = 70, step = 1),
                                                  numericInput("n_splits", "Number of splits :",
@@ -997,23 +1172,53 @@ server <- function(input, output, session) {
                                            height=300,
                                            alt="structure data"))},deleteFile = F)
   
+  
+  # DATA <- reactive({
+  #   importparameters<<-list("file"=input$file,
+  #                           "extension" = input$file_type,
+  #                           "sheetn"=input$sheetn,
+  #                           "skipn"=input$skipn,
+  #                           "dec"=input$dec,
+  #                           "sep"=input$sep,
+  #                           "transpose"=input$transpose #,
+  #                           )
+  #   
+  #   out<-tryCatch(importfunction(importparameters),error=function(e) e )
+  #   validate(need(any(class(out)!="error"),"error import"))
+  #   resimport<<-out
+  #   print(str(out))
+  #   list(LEARNING=resimport$learning, 
+  #        previousparameters=resimport$previousparameters  
+  #   )
+  # })
+  # 
+  # 
+  # observe({
+  #   req(DATA()$LEARNING)
+  #   if(!is.null(DATA()$LEARNING)){
+  #     cat('DATA()$LEARNING \n')
+  #     print(str(DATA()$LEARNING))
+  #   }
+  # })
+  # 
   # Variable réactive pour stocker les données
-  data_loaded <- reactiveVal(NULL)
+  #data_loaded <- reactiveVal(NULL)
   splits_generated <- reactiveVal(NULL)
   
   update_sex = reactiveVal(FALSE)
+  # Variable réactive pour stocker les données BRUTES (non transposées)
+  data_raw <- reactiveVal(NULL)
   
-  # Charger les données avec le bouton
-  observeEvent({input$file
-    input$csv_sep
-    input$csv_dec
+  # observeEvent UNIQUEMENT pour le chargement initial
+  observeEvent({
+    input$file
+    input$sep
+    input$dec
     input$csv_na
-    input$transpose_data
-    #input$sex_col
+    input$file_type
   }, {
-    #input$load_btn, {
     req(input$file)
-    req(input$csv_dec, input$csv_sep)
+    req(input$dec, input$sep)
     
     tryCatch({
       ext <- tools::file_ext(input$file$name)
@@ -1021,21 +1226,16 @@ server <- function(input, output, session) {
       
       # Charger selon le type sélectionné
       if (input$file_type == "csv") {
-        # Préparer les chaînes NA
         na_strings <- trimws(unlist(strsplit(input$csv_na, ",")))
         if (length(na_strings) == 0 || na_strings[1] == "") {
           na_strings <- "NA"
         }
-        cat("NA strings:", paste(na_strings, collapse = ";"), "\n")
-        cat('Dec char:', input$csv_dec, '\n')
-        cat('Sep char:', input$csv_sep, '\n')
         
-        # Lire le CSV avec les paramètres personnalisés
         data <- read.table(
           input$file$datapath,
           header = TRUE,
-          sep = input$csv_sep,
-          dec = input$csv_dec,
+          sep = input$sep,
+          dec = input$dec,
           na.strings = na_strings,
           stringsAsFactors = FALSE,
           check.names = FALSE
@@ -1043,70 +1243,162 @@ server <- function(input, output, session) {
         
       } else if (input$file_type == "excel") {
         if (ext %in% c("xlsx", "xls")) {
-          #data <- read.xlsx(input$file$datapath, sheet = 1)
           data <- openxlsx::read.xlsx(
             xlsxFile = input$file$datapath, 
-            sheet = 1,
+            sheet = input$sheetn,
             colNames = TRUE,
             check.names = FALSE
           )
         } else {
-          showNotification("For Excel, select an .xlsx or .xls file", type = "error")
+          showNotification("For Excel, select an .xlsx or .xls file.", type = "error")
           return()
         }
       }
       
-      # Vérifier que les données ont été chargées
       if (is.null(data)) {
         showNotification("Error loading data", type = "error")
         return()
       }
       
-      # Transposer the data
-      if (input$transpose_data) {
-        # Sauvegarder les noms de colonnes originaux (qui deviendront des ID/labels)
-        original_colnames <- colnames(data)
-        
-        # Transposer les données
-        data_t = transformdata(data,transpose = input$transpose_data )
-        # data_t <- as.data.frame(t(data), stringsAsFactors = FALSE)
-        # 
-        # if (nrow(data_t) > 0) {
-        #   data_t <- cbind(Variable = original_colnames, data_t)
-        # 
-        #   #colnames(data_t) <- c("Variable", paste0("Sample_", 1:(ncol(data_t)-1)))
-        # }
-        
-        data <- data_t
-      }
-      
-      
-      # if (input$transpose_data) {
-      #   # Sauvegarder les noms de colonnes comme première colonne
-      #   first_col <- colnames(data)
-      #   data_t <- as.data.frame(t(data), stringsAsFactors = FALSE)
-      #   
-      #   # Utiliser la première ligne comme noms de colonnes
-      #   if (nrow(data_t) > 0) {
-      #     colnames(data_t) <- first_col
-      #     data <- data_t
-      #   }
-      # }
-      
-      # Stocker les données
-      data_loaded(data)
-      
-      # Mettre à jour les choix de la variable cible
-      updateSelectInput(session, "target_col",
-                        choices = names(data),
-                        selected = names(data)[1])
-      
-      showNotification("Data successfully loaded!", type = "message")
+      # Stocker les données BRUTES (sans transposition)
+      data_raw(data)
+      showNotification("Data successfully loaded !", type = "message")
       
     }, error = function(e) {
-      showNotification(paste("Error:", e$message), type = "error")
+      showNotification(paste("Erreur:", e$message), type = "error")
     })
   })
+  
+  # Reactive pour appliquer la transposition SI nécessaire
+  data_loaded <- reactive({
+     req(data_raw())
+    #req(DATA()$LEARNING)
+    data <- data_raw()
+
+    # Appliquer la transposition uniquement si demandé
+    if (input$transpose) {
+      withProgress(message = 'Transposition en cours...', value = 0.5, {
+        data <- transformdata(data, transpose = TRUE)
+      })
+    }
+
+    return(data)
+    #return(DATA()$LEARNING)
+  })
+  
+  # Observer pour mettre à jour les choix de colonnes APRÈS transposition
+  observe({
+    req(data_loaded())
+    
+    updateSelectInput(session, "target_col",
+                      choices = names(data_loaded()),
+                      selected = names(data_loaded())[1])
+  })
+  
+  # # Charger les données avec le bouton
+  # observeEvent({input$file
+  #   input$sep
+  #   input$dec
+  #   input$csv_na
+  #   input$transpose
+  #   #input$sex_col
+  # }, {
+  #   #input$load_btn, {
+  #   req(input$file)
+  #   req(input$dec, input$sep)
+  #   
+  #   tryCatch({
+  #     ext <- tools::file_ext(input$file$name)
+  #     data <- NULL
+  #     
+  #     # Charger selon le type sélectionné
+  #     if (input$file_type == "csv") {
+  #       # Préparer les chaînes NA
+  #       na_strings <- trimws(unlist(strsplit(input$csv_na, ",")))
+  #       if (length(na_strings) == 0 || na_strings[1] == "") {
+  #         na_strings <- "NA"
+  #       }
+  #       cat("NA strings:", paste(na_strings, collapse = ";"), "\n")
+  #       cat('Dec char:', input$dec, '\n')
+  #       cat('Sep char:', input$sep, '\n')
+  #       
+  #       # Lire le CSV avec les paramètres personnalisés
+  #       data <- read.table(
+  #         input$file$datapath,
+  #         header = TRUE,
+  #         sep = input$sep,
+  #         dec = input$dec,
+  #         na.strings = na_strings,
+  #         stringsAsFactors = FALSE,
+  #         check.names = FALSE
+  #       )
+  #       
+  #     } else if (input$file_type == "excel") {
+  #       if (ext %in% c("xlsx", "xls")) {
+  #         #data <- read.xlsx(input$file$datapath, sheet = 1)
+  #         data <- openxlsx::read.xlsx(
+  #           xlsxFile = input$file$datapath, 
+  #           sheet = 1,
+  #           colNames = TRUE,
+  #           check.names = FALSE
+  #         )
+  #       } else {
+  #         showNotification("For Excel, select an .xlsx or .xls file", type = "error")
+  #         return()
+  #       }
+  #     }
+  #     
+  #     # Vérifier que les données ont été chargées
+  #     if (is.null(data)) {
+  #       showNotification("Error loading data", type = "error")
+  #       return()
+  #     }
+  #     
+  #     # Transposer the data
+  #     if (input$transpose) {
+  #       # Sauvegarder les noms de colonnes originaux (qui deviendront des ID/labels)
+  #       original_colnames <- colnames(data)
+  #       
+  #       # Transposer les données
+  #       data_t = transformdata(data,transpose = input$transpose )
+  #       # data_t <- as.data.frame(t(data), stringsAsFactors = FALSE)
+  #       # 
+  #       # if (nrow(data_t) > 0) {
+  #       #   data_t <- cbind(Variable = original_colnames, data_t)
+  #       # 
+  #       #   #colnames(data_t) <- c("Variable", paste0("Sample_", 1:(ncol(data_t)-1)))
+  #       # }
+  #       
+  #       data <- data_t
+  #     }
+  #     
+  #     
+  #     # if (input$transpose) {
+  #     #   # Sauvegarder les noms de colonnes comme première colonne
+  #     #   first_col <- colnames(data)
+  #     #   data_t <- as.data.frame(t(data), stringsAsFactors = FALSE)
+  #     #   
+  #     #   # Utiliser la première ligne comme noms de colonnes
+  #     #   if (nrow(data_t) > 0) {
+  #     #     colnames(data_t) <- first_col
+  #     #     data <- data_t
+  #     #   }
+  #     # }
+  #     
+  #     # Stocker les données
+  #     data_loaded(data)
+  #     
+  #     # Mettre à jour les choix de la variable cible
+  #     updateSelectInput(session, "target_col",
+  #                       choices = names(data),
+  #                       selected = names(data)[1])
+  #     
+  #     showNotification("Data successfully loaded!", type = "message")
+  #     
+  #   }, error = function(e) {
+  #     showNotification(paste("Error:", e$message), type = "error")
+  #   })
+  # })
   
   output$get_clinivars <- renderUI({
     req(data_loaded())
@@ -1136,11 +1428,25 @@ server <- function(input, output, session) {
   # 
   
   # Aperçu des données
-  output$data_preview <- renderDT({
+  # output$data_preview <- renderDataTable({
+  #   req(data_loaded())
+  #   datatable(head(data_loaded(), 100),
+  #             options = list(scrollX = TRUE, pageLength = 10))
+  #   # req(DATA()$LEARNING)
+  #   # datatable(head(DATA()$LEARNING, 100),
+  #   #           options = list(scrollX = TRUE, pageLength = 10))
+  # })
+  
+  output$data_preview=renderDataTable({
     req(data_loaded())
-    datatable(head(data_loaded(), 100),
-              options = list(scrollX = TRUE, pageLength = 10))
-  })
+    learning<-data_loaded()
+    validate(need(!is.null(learning),"problem import"))
+    colmin<-min(ncol(learning),100)
+    rowmin<-min(nrow(learning),100)
+    cbind(Names=rownames(learning[1:rowmin,1:colmin]),learning[1:rowmin,1:colmin])},
+    options = list(    "orderClasses" = F,
+                       "responsive" = F,
+                       "pageLength" = 10))
   
   # Informations sur les données
   output$data_info <- renderPrint({
@@ -1337,7 +1643,7 @@ server <- function(input, output, session) {
         selectInput("age_col", "Age column:",
           choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
         )
-        ,
+        #,
         # sliderInput( "n_age_bins", "Nombre de groupes d'âge:",
         #   min = 2,
         #   max = 10,
