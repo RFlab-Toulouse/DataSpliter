@@ -1255,8 +1255,9 @@ server <- function(input, output, session) {
                             path = input$file$datapath, 
                             sheet = input$sheetn,
                             skip = input$skipn,
-                            col_names = T,
+                            col_names = F,
                             )  %>% as.data.frame()
+          rownames(data) <- NULL 
         } else {
           showNotification("For Excel, select an .xlsx or .xls file.", type = "error")
           return()
