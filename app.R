@@ -25,75 +25,75 @@ library(dplyr)
 library(ggplot2)
 library(gtsummary)
 
-confirmdata<-function(toto){
-  toto<-as.data.frame(toto)
-  toto[,1]<-as.factor(as.character(toto[,1]))
-  for (i in 2:ncol(toto)){
-    toto[,i]<-as.numeric(as.character(toto[,i]))
-  }
-  return(toto)
-}
-
-importfunction<-function(importparameters){
-  previousparameters<-NULL
-  validation<-NULL
-  learning<-NULL
-  
-  if(is.null(importparameters$file) & is.null(importparameters$modelfile)){return()}
-  
-  if(!is.null(importparameters$file)  ){
-    datapath<- importparameters$file$datapath
-    learning<-importfile(datapath = datapath,
-                         extension = importparameters$extension
-                         ,NAstring=NULL, #importparameters$NAstring,
-                         sheet=importparameters$sheetn,
-                         skiplines=importparameters$skipn,
-                         dec=importparameters$dec,
-                         sep=importparameters$sep)
-    
-    learning<-transformdata(toto = learning,
-                            transpose=importparameters$transpose
-                            )
-    
-  
-      learning<-confirmdata(toto = learning)
-  }
-  
-  res<-list("learning"=learning,previousparameters=previousparameters)
-  return(res)
-}
-
-importfile <- function (datapath,extension,NAstring="NA",sheet=1,skiplines=0,dec=".",sep=","){
-  if(extension=="csv"){
-    toto <<- read.csv2(datapath,header = F,sep =sep,dec=dec,na.strings = NAstring,stringsAsFactors = F,row.names=NULL,check.names = F )
-  }
-  if(extension=="excel"){
-    options(warn=-1)
-    filerm<<-file.rename(datapath,paste(datapath, ".xlsx", sep=""))
-    options(warn=0)
-    toto <<-readxl:::read_excel(paste(datapath, ".xlsx", sep=""),
-                                na=NAstring,col_names = F,
-                                skip = skiplines,
-                                sheet = sheet) %>% as.data.frame()
-  }
-  if(length(which(apply(X = toto,MARGIN=2,function(x){sum(is.na(x))})==nrow(toto)))!=0){
-    toto<-toto[,-which(apply(X = toto,MARGIN=2,function(x){sum(is.na(x))})==nrow(toto))]}
-  if(length(which(apply(X = toto,MARGIN=1,function(x){sum(is.na(x))})==ncol(toto)))!=0){
-    toto<-toto[-which(apply(X = toto,MARGIN=1,function(x){sum(is.na(x))})==ncol(toto)),]}
-  print(class(toto))
-  
-  rnames<-as.character(as.matrix(toto[,1]))
-  cnames<-as.character(as.matrix(toto[1,]))
-  toto<-toto[,-1]
-  toto<-toto[-1,]
-  row.names(toto)<-rnames[-1]
-  colnames(toto)<-cnames[-1]
-  
-  toto<-as.data.frame(toto)
-  rownames(toto)<-rnames[-1]
-  colnames(toto)<-cnames[-1]
-  return(toto)
-}
+# confirmdata<-function(toto){
+#   toto<-as.data.frame(toto)
+#   toto[,1]<-as.factor(as.character(toto[,1]))
+#   for (i in 2:ncol(toto)){
+#     toto[,i]<-as.numeric(as.character(toto[,i]))
+#   }
+#   return(toto)
+# }
+# 
+# importfunction<-function(importparameters){
+#   previousparameters<-NULL
+#   validation<-NULL
+#   learning<-NULL
+#   
+#   if(is.null(importparameters$file) & is.null(importparameters$modelfile)){return()}
+#   
+#   if(!is.null(importparameters$file)  ){
+#     datapath<- importparameters$file$datapath
+#     learning<-importfile(datapath = datapath,
+#                          extension = importparameters$extension
+#                          ,NAstring=NULL, #importparameters$NAstring,
+#                          sheet=importparameters$sheetn,
+#                          skiplines=importparameters$skipn,
+#                          dec=importparameters$dec,
+#                          sep=importparameters$sep)
+#     
+#     learning<-transformdata(toto = learning,
+#                             transpose=importparameters$transpose
+#                             )
+#     
+#   
+#       learning<-confirmdata(toto = learning)
+#   }
+#   
+#   res<-list("learning"=learning,previousparameters=previousparameters)
+#   return(res)
+# }
+# 
+# importfile <- function (datapath,extension,NAstring="NA",sheet=1,skiplines=0,dec=".",sep=","){
+#   if(extension=="csv"){
+#     toto <<- read.csv2(datapath,header = F,sep =sep,dec=dec,na.strings = NAstring,stringsAsFactors = F,row.names=NULL,check.names = F )
+#   }
+#   if(extension=="excel"){
+#     options(warn=-1)
+#     filerm<<-file.rename(datapath,paste(datapath, ".xlsx", sep=""))
+#     options(warn=0)
+#     toto <<-readxl:::read_excel(paste(datapath, ".xlsx", sep=""),
+#                                 na=NAstring,col_names = F,
+#                                 skip = skiplines,
+#                                 sheet = sheet) %>% as.data.frame()
+#   }
+#   if(length(which(apply(X = toto,MARGIN=2,function(x){sum(is.na(x))})==nrow(toto)))!=0){
+#     toto<-toto[,-which(apply(X = toto,MARGIN=2,function(x){sum(is.na(x))})==nrow(toto))]}
+#   if(length(which(apply(X = toto,MARGIN=1,function(x){sum(is.na(x))})==ncol(toto)))!=0){
+#     toto<-toto[-which(apply(X = toto,MARGIN=1,function(x){sum(is.na(x))})==ncol(toto)),]}
+#   print(class(toto))
+#   
+#   rnames<-as.character(as.matrix(toto[,1]))
+#   cnames<-as.character(as.matrix(toto[1,]))
+#   toto<-toto[,-1]
+#   toto<-toto[-1,]
+#   row.names(toto)<-rnames[-1]
+#   colnames(toto)<-cnames[-1]
+#   
+#   toto<-as.data.frame(toto)
+#   rownames(toto)<-rnames[-1]
+#   colnames(toto)<-cnames[-1]
+#   return(toto)
+# }
 
 
 # transformdata<-function(toto,transpose){
@@ -1097,7 +1097,7 @@ ui <- fluidPage(
                                                ),
                                                box(
                                                  width = 3,
-                                                 title = "startifcation Varaibles",
+                                                 title = "startifcation Variables",
                                                  status = "warning",
                                                  solidHeader = TRUE,
                                                  uiOutput("stratified_vars_ui")
