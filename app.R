@@ -1216,6 +1216,8 @@ server <- function(input, output, session) {
     input$dec
     input$csv_na
     input$file_type
+    input$sheetn
+    input$skipn
   }, {
     req(input$file)
     req(input$dec, input$sep)
@@ -1243,12 +1245,18 @@ server <- function(input, output, session) {
         
       } else if (input$file_type == "excel") {
         if (ext %in% c("xlsx", "xls")) {
-          data <- openxlsx::read.xlsx(
-            xlsxFile = input$file$datapath, 
-            sheet = input$sheetn,
-            colNames = TRUE,
-            check.names = FALSE
-          )
+          #data <- openxlsx::read.xlsx(
+          #   xlsxFile = input$file$datapath, 
+          #   sheet = input$sheetn,
+          #   colNames = TRUE,
+          #   check.names = FALSE
+          # )
+          data <- readxl::read_excel(
+                            path = input$file$datapath, 
+                            sheet = input$sheetn,
+                            skip = input$skipn,
+                            col_names = T,
+                            )  %>% as.data.frame()
         } else {
           showNotification("For Excel, select an .xlsx or .xls file.", type = "error")
           return()
