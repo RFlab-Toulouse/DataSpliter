@@ -25,6 +25,7 @@ library(openxlsx)
 library(dplyr)
 library(ggplot2)
 library(gtsummary)
+library(readxl)
 
 # confirmdata<-function(toto){
 #   toto<-as.data.frame(toto)
@@ -1636,7 +1637,6 @@ server <- function(input, output, session) {
     choices <- setdiff(names(data), input$target_col)
     
     fluidRow(
-      
       # Sex (optionnel)
       checkboxInput("use_sex","Stratify by sex", value = FALSE),
       
@@ -1667,7 +1667,8 @@ server <- function(input, output, session) {
       
       conditionalPanel(
         condition = sprintf("input['%s']", "use_gfr"),
-        selectInput( "gfr_col","eGFR column:", choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
+        selectInput( "gfr_col","eGFR column:", 
+                     choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)]
         )
         # ,
         # sliderInput("n_gfr_bins", "Nombre de groupes de GFR:",
@@ -1676,7 +1677,18 @@ server <- function(input, output, session) {
         #   value = 4,
         #   step = 1
         # )
-      )
+      ),
+      checkboxInput("use_numvars1", "stratfiy by a numeric var : ", value =  FALSE),
+      conditionalPanel(condition = sprintf("input['%s']", "use_numvars1"),
+                       selectInput("numvars1","choose a numerical variable : ", 
+                                   choices =  names(data[final_cols])[sapply(data[final_cols], is.numeric)] )
+                       ),
+      checkboxInput("use_numVars2", label = "stratfiy by another numeric var :", value = FALSE),
+      conditionalPanel(condition = sprintf("input['%s']", "use_numVars2"), 
+                       selectInput("numvar2", "choose a numerical variable : " , 
+                                   choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)])
+                       
+                       )
     )
   })
 }
