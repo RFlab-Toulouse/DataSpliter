@@ -16,6 +16,7 @@ usePackage("dplyr")
 usePackage("ggplot2")
 usePackage("gtsummary")
 usePackage("readxl")
+usePackage("data.table")
 
 library(shiny)
 library(shinycssloaders)
@@ -26,6 +27,7 @@ library(dplyr)
 library(ggplot2)
 library(gtsummary)
 library(readxl)
+library(data.table)
 
 # confirmdata<-function(toto){
 #   toto<-as.data.frame(toto)
@@ -362,8 +364,12 @@ create_split <- function(data,
                          sex_col = NULL,
                          age_col = NULL,
                          gfr_col = NULL,
+                         num_var1 =  NULL,
+                         num_var2 =  NULL,
                          n_age_bins = 4,
                          n_gfr_bins = 4,
+                         n_NM1_bind = 4,
+                         n_NM2_bind = 4,
                          seed = NULL) {
   
   # --------------------------------------------------------------------------
@@ -434,6 +440,37 @@ create_split <- function(data,
     data_work$gfr_bin_temp <- data_work[[gfr_col]]
   }
   
+  # dicrétiser le num_var1  si specifié et c'est numerique 
+  if (!is.null(num_var1) && is.numeric(data_work[[num_var1]])) {
+    data_work$numvar1_bin_temp <- cut(
+      data_work[[num_var1]], 
+      breaks = quantile(data_work[[num_var1]], 
+                        probs = seq(0, 1, length.out = n_gfr_bins + 1),
+                        na.rm = TRUE),
+      include.lowest = TRUE,
+      labels = paste0("numvar1_bin_temp_Q", 1:n_gfr_bins)
+    )
+  } else if (!is.null(num_var1)) {
+    # Si gfr est déjà catégoriel, l'utiliser directement
+    data_work$numvar1_bin_temp <- data_work[[num_var1]]
+  }
+  
+  
+  # dicrétiser le num_var1  si specifié et c'est numerique 
+  if (!is.null(num_var2) && is.numeric(data_work[[num_var2]])) {
+    data_work$numvar2_bin_temp <- cut(
+      data_work[[num_var2]], 
+      breaks = quantile(data_work[[num_var2]], 
+                        probs = seq(0, 1, length.out = n_gfr_bins + 1),
+                        na.rm = TRUE),
+      include.lowest = TRUE,
+      labels = paste0("numvar2_bin_temp_Q", 1:n_gfr_bins)
+    )
+  } else if (!is.null(num_var2)) {
+    # Si gfr est déjà catégoriel, l'utiliser directement
+    data_work$numvar2_bin_temp <- data_work[[num_var2]]
+  }
+  
   # --------------------------------------------------------------------------
   # 4. CRÉER LA VARIABLE DE STRATIFICATION COMBINÉE
   # --------------------------------------------------------------------------
@@ -450,6 +487,14 @@ create_split <- function(data,
   
   if (!is.null(gfr_col)) {
     strata_components <- c(strata_components, list(data_work$gfr_bin_temp))
+  }
+  
+  if (!is.null(num_var1)) {
+    strata_components <- c(strata_components, list(data_work$numvar1_bin_temp))
+  }
+  
+  if (!is.null(num_var2)) {
+    strata_components <- c(strata_components, list(data_work$numvar2_bin_temp))
   }
   
   # Combiner toutes les variables en une seule strate
@@ -961,6 +1006,14 @@ ui <- fluidPage(
                                     min = 1, 
                                     max = 100)
                 )
+              ),
+              fluidRow(
+                column(width =  6 , 
+                       shiny::radioButtons("check_colnames", "check  colnames ", 
+                                                 choices = c("TRUE", "FALSE"),
+                                                 selected = "FALSE"
+                                                 )
+                       )
               )
             )
             ,checkboxInput("transpose", "Transpose",value = FALSE)
@@ -1220,6 +1273,7 @@ server <- function(input, output, session) {
     input$file_type
     input$sheetn
     input$skipn
+    input$check_colnames
   }, {
     req(input$file)
     req(input$dec, input$sep)
@@ -1257,7 +1311,7 @@ server <- function(input, output, session) {
                             path = input$file$datapath, 
                             sheet = input$sheetn,
                             skip = input$skipn,
-                            col_names = F,
+                            col_names = ifelse(input$check_colnames == "FALSE", FALSE, TRUE),
                             )  %>% as.data.frame()
           rownames(data) <- NULL 
         } else {
