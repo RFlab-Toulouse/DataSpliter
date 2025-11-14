@@ -137,7 +137,7 @@ transformdata <- function(toto, transpose) {
       toto <- toto[-1, ]
     }
     
-    # Conversion automatique des colonnes numériques (optionnel et rapide)
+    # Conversion automatique des colonnes numériques 
     toto[] <- lapply(toto, function(x) {
       num_x <- suppressWarnings(as.numeric(as.character(x)))
       if(sum(!is.na(num_x)) / length(x) > 0.8) num_x else x
