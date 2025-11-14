@@ -15,6 +15,7 @@ usePackage("openxlsx")
 usePackage("dplyr")
 usePackage("ggplot2")
 usePackage("gtsummary")
+usePackage("readxl")
 
 library(shiny)
 library(shinycssloaders)
