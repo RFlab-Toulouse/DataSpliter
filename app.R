@@ -694,7 +694,7 @@ export_split_to_excel <- function(split_data, file_path, target_col, clinic_vars
       vars_to_include <- c(vars_to_include, target_col)
     }
     
-    cat("le variable incluses : ", length(vars_to_include), "\n")
+    #cat("le variable incluses : ", length(vars_to_include), "\n")
     
     train_data <- split_data$train[, vars_to_include, drop = FALSE]
     train_data$Dataset <- "Train"
