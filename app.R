@@ -1011,7 +1011,7 @@ ui <- fluidPage(
               ),
               fluidRow(
                 column(width =  6 , 
-                       shiny::radioButtons("check_colnames", "define the first line as a header :", 
+                       shiny::radioButtons("check_colnames", "define 1st row as header :", 
                                                  choices = c("TRUE", "FALSE"),
                                                  selected = "FALSE"
                                                  )
@@ -1765,12 +1765,12 @@ server <- function(input, output, session) {
         #   step = 1
         # )
       ),
-      checkboxInput("use_numvars1", "stratfiy by a numeric var : ", value =  FALSE),
+      checkboxInput("use_numvars1", "stratfiy by a numeric var", value =  FALSE),
       conditionalPanel(condition = sprintf("input['%s']", "use_numvars1"),
                        selectInput("numvars1","choose a numerical variable : ", 
                                    choices =  names(data[final_cols])[sapply(data[final_cols], is.numeric)] )
                        ),
-      checkboxInput("use_numvars2", label = "stratfiy by another numeric var :", value = FALSE),
+      checkboxInput("use_numvars2", label = "stratfiy by another numeric var", value = FALSE),
       conditionalPanel(condition = sprintf("input['%s']", "use_numvars2"), 
                        selectInput("numvar2", "choose a numerical variable : " , 
                                    choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)])
