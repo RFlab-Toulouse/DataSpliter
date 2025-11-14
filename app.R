@@ -672,30 +672,30 @@ export_split_to_excel <- function(split_data, file_path, target_col, clinic_vars
   #             startCol = 1, startRow = current_row)
   # }
   
-  # ===== FEUILLE 4 : Tableau gtsummary =====
+  # ===== FEUILLE 3 : Tableau gtsummary =====
   addWorksheet(wb, "Summary_Table")
   
   tryCatch({
-    # Charger gtsummary si pas déjà fait
     if (!require(gtsummary)) {
       install.packages("gtsummary")
       library(gtsummary)
     }
     
-    # Déterminer les variables à inclure
     if (!is.null(clinic_vars) && length(clinic_vars) > 0) {
       vars_to_include <- c(clinic_vars)
     } else {
-      # Exclure les variables qui ressemblent à des features omiques (finissant par des chiffres)
-      vars_to_include <- names(split_data$train)[!grepl("\\d+$", names(split_data$train))]
+      # Exclure les variables qui ressemblent à des features omiques (commençant par des chiffres)
+      vars_to_include <- names(split_data$train)[!grepl("^\\d+$", names(split_data$train))]
+      # vars_to_include =  target_col
     }
     
-    # S'assurer que target_col est inclus
+
     if (!target_col %in% vars_to_include) {
       vars_to_include <- c(vars_to_include, target_col)
     }
     
-    # Créer les données pour gtsummary
+    cat("le variable incluses : ", length(vars_to_include), "\n")
+    
     train_data <- split_data$train[, vars_to_include, drop = FALSE]
     train_data$Dataset <- "Train"
     
@@ -737,7 +737,8 @@ export_split_to_excel <- function(split_data, file_path, target_col, clinic_vars
     )
     
     addStyle(wb, "Summary_Table", headerStyle2, 
-             rows = 1, cols = 1:ncol(summary_df), gridExpand = TRUE)
+             rows = 1, cols = 1:ncol(summary_df), 
+             gridExpand = TRUE)
     
     # Ajuster la largeur des colonnes
     setColWidths(wb, "Summary_Table", cols = 1:ncol(summary_df), widths = "auto")
@@ -1010,7 +1011,7 @@ ui <- fluidPage(
                 )
               ),
               fluidRow(
-                column(width =  6 , 
+                column(width =  12 , 
                        shiny::radioButtons("check_colnames", "define 1st row as header :", 
                                                  choices = c("TRUE", "FALSE"),
                                                  selected = "FALSE"
