@@ -17,6 +17,7 @@ usePackage("ggplot2")
 usePackage("gtsummary")
 usePackage("readxl")
 usePackage("data.table")
+usePackage("shinyBS")
 
 library(shiny)
 library(shinycssloaders)
@@ -28,6 +29,7 @@ library(ggplot2)
 library(gtsummary)
 library(readxl)
 library(data.table)
+library(shinyBS)
 
 # confirmdata<-function(toto){
 #   toto<-as.data.frame(toto)
@@ -1355,9 +1357,15 @@ server <- function(input, output, session) {
   observe({
     req(data_loaded())
     
+    cols_to_remove <- colnames(data_loaded())[grepl('^\\d+$', colnames(data_loaded()))]
+    
+    filtered_data <- data_loaded()[, !colnames(data_loaded()) %in% cols_to_remove]
+    
+    numbers_rows <- nrow(filtered_data)
+    
     updateSelectInput(session, "target_col",
-                      choices = names(data_loaded()),
-                      selected = names(data_loaded())[1])
+                      choices = names(filtered_data),
+                      selected = names(filtered_data)[1])
   })
   
   # # Charger les données avec le bouton
@@ -1476,11 +1484,31 @@ server <- function(input, output, session) {
     
     # conditionalPanel(
     #   condition = "output.number_rows > 0", 
-      selectInput("clinicalvars", label = "Choose clinical variables (statistics):", 
+    tagList(
+      selectInput("clinicalvars", 
+                  label = "Choose clinical variables (statistics):", 
                   choices = names(filtered_data)[sapply(filtered_data, function(x) is.numeric(x) | is.factor(x) | is.character(x))],
-                  multiple = TRUE)
+                  multiple = TRUE),
+      bsTooltip("clinicalvars", 
+                "The selected variables will appear in the summary table (sheet 3).",
+                placement = "right", 
+                options = list(container = "body"))
+    )
     #)
  })
+  
+  observe({
+    if(!is.null(input$clinicalvars)){
+      removeTooltip(session = session, id = "clinicalvars")
+    }else{
+      addTooltip(session = session, 
+                 id  = "clinicalvars",
+                 title  = "The selected variables will appear in the summary table (sheet 3).",
+                 placement = "right",
+                 trigger = "hover"
+                 )
+    }
+  })
   
   # output$number_rows <- reactive({
   #   req(data_loaded())
@@ -1564,17 +1592,22 @@ server <- function(input, output, session) {
         sex_col <- if (input$use_sex) input$sex_col else NULL
         age_col <- if (input$use_age) input$age_col else NULL
         gfr_col <- if (input$use_gfr) input$gfr_col else NULL
-        split_data <-  create_split(
-                    data = data,
-                    train_ratio = train_ratio,
-                    target_col = input$target_col,
-                    sex_col = sex_col,
-                    age_col = age_col,
-                    gfr_col = gfr_col,
-                    n_age_bins = 4, #input$n_age_bins,
-                    n_gfr_bins = 4, #input$n_gfr_bins,
-                    seed = seed
-                  )
+        
+        numvars1 <- if (input$use_numvars1) input$numvars1 else NULL
+        numvars2 <- if (input$use_numvars2) input$numvars2 else NULL
+        split_data <- create_split(
+                              data = data,
+                              train_ratio = train_ratio,
+                              target_col = input$target_col,
+                              sex_col = sex_col,
+                              age_col = age_col,
+                              gfr_col = gfr_col,
+                              num_var1 = numvars1,
+                              num_var2 = numvars2,
+                              n_age_bins = 4, #input$n_age_bins,
+                              n_gfr_bins = 4, #input$n_gfr_bins,
+                              seed = seed
+                            )
         
         # Nom du fichier
         file_name <- sprintf("split_%02d.xlsx", i)
@@ -1737,8 +1770,8 @@ server <- function(input, output, session) {
                        selectInput("numvars1","choose a numerical variable : ", 
                                    choices =  names(data[final_cols])[sapply(data[final_cols], is.numeric)] )
                        ),
-      checkboxInput("use_numVars2", label = "stratfiy by another numeric var :", value = FALSE),
-      conditionalPanel(condition = sprintf("input['%s']", "use_numVars2"), 
+      checkboxInput("use_numvars2", label = "stratfiy by another numeric var :", value = FALSE),
+      conditionalPanel(condition = sprintf("input['%s']", "use_numvars2"), 
                        selectInput("numvar2", "choose a numerical variable : " , 
                                    choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)])
                        
