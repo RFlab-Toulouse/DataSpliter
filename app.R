@@ -1009,7 +1009,7 @@ ui <- fluidPage(
               ),
               fluidRow(
                 column(width =  6 , 
-                       shiny::radioButtons("check_colnames", "check  colnames ", 
+                       shiny::radioButtons("check_colnames", "define the first line as a header :", 
                                                  choices = c("TRUE", "FALSE"),
                                                  selected = "FALSE"
                                                  )
