@@ -359,24 +359,40 @@ calculate_descriptive_stats <- function(data, target_col, clinic_vars = NULL) {
 #   return(stats_list)
 # }
 
-#' Créer un split train/validation
+#' Créer un split train/validation stratifié
+#' 
+#' @param data Data frame contenant les données
+#' @param train_ratio Proportion des données pour l'ensemble d'entraînement (0-1)
+#' @param target_col Nom de la colonne cible pour la classification
+#' @param sex_col Nom de la colonne sexe (optionnel)
+#' @param age_col Nom de la colonne âge (optionnel)
+#' @param gfr_col Nom de la colonne GFR (optionnel)
+#' @param num_var1 Nom d'une variable numérique supplémentaire (optionnel)
+#' @param num_var2 Nom d'une deuxième variable numérique (optionnel)
+#' @param n_age_bins Nombre de bins pour l'âge
+#' @param n_gfr_bins Nombre de bins pour le GFR
+#' @param n_NM1_bind Nombre de bins pour num_var1
+#' @param n_NM2_bind Nombre de bins pour num_var2
+#' @param seed Graine aléatoire pour la reproductibilité
+#' 
+#' @return Liste contenant les ensembles train et validation
 create_split <- function(data, 
                          train_ratio = 0.7,
                          target_col,
                          sex_col = NULL,
                          age_col = NULL,
                          gfr_col = NULL,
-                         num_var1 =  NULL,
-                         num_var2 =  NULL,
+                         num_var1 = NULL,
+                         num_var2 = NULL,
                          n_age_bins = 4,
                          n_gfr_bins = 4,
                          n_NM1_bind = 4,
                          n_NM2_bind = 4,
                          seed = NULL) {
   
-  # --------------------------------------------------------------------------
+  # ==========================================================================
   # 1. VALIDATION DES ENTRÉES
-  # --------------------------------------------------------------------------
+  # ==========================================================================
   
   if (!is.null(seed)) {
     set.seed(seed)
@@ -388,7 +404,7 @@ create_split <- function(data,
   }
   
   # Vérifier les autres colonnes si spécifiées
-  cols_to_check <- c(sex_col, age_col, gfr_col)
+  cols_to_check <- c(sex_col, age_col, gfr_col, num_var1, num_var2)
   cols_to_check <- cols_to_check[!is.null(cols_to_check)]
   
   missing_cols <- setdiff(cols_to_check, names(data))
@@ -400,82 +416,91 @@ create_split <- function(data,
     stop("train_ratio doit être entre 0 et 1")
   }
   
-  if(!is.null(sex_col)){
-    verif_sex = ifelse(is.numeric(data[[sex_col]]), "yes", "no")
-    #cat(" c'est un  integer \n")
-    if(verif_sex =="yes"){
-      #cat('on est dans la sauce\n')
-      data[[sex_col]] = as.factor(data[[sex_col]])
-    }
-  }
-  
+  # ==========================================================================
+  # 2. PRÉPARATION DES DONNÉES
+  # ==========================================================================
   
   data_work <- data
   
-  # Discrétiser age si spécifié et si c'est numérique
-  if (!is.null(age_col) && is.numeric(data_work[[age_col]])) {
-    data_work$age_bin_temp <- cut(
-      data_work[[age_col]], 
-      breaks = quantile(data_work[[age_col]], 
-                        probs = seq(0, 1, length.out = n_age_bins + 1),
-                        na.rm = TRUE),
-      include.lowest = TRUE,
-      labels = paste0("age_Q", 1:n_age_bins)
-    )
-  } else if (!is.null(age_col)) {
-    # Si age est déjà catégoriel, l'utiliser directement
-    data_work$age_bin_temp <- data_work[[age_col]]
+  # Convertir sex_col en facteur si c'est numérique
+  if (!is.null(sex_col) && is.numeric(data_work[[sex_col]])) {
+    data_work[[sex_col]] <- as.factor(data_work[[sex_col]])
   }
   
-  # Discrétiser gfr si spécifié et si c'est numérique
-  if (!is.null(gfr_col) && is.numeric(data_work[[gfr_col]])) {
-    data_work$gfr_bin_temp <- cut(
-      data_work[[gfr_col]], 
-      breaks = quantile(data_work[[gfr_col]], 
-                        probs = seq(0, 1, length.out = n_gfr_bins + 1),
-                        na.rm = TRUE),
+  # ==========================================================================
+  # 3. FONCTION HELPER POUR DISCRÉTISER UNE VARIABLE NUMÉRIQUE
+  # ==========================================================================
+  
+  discretize_variable <- function(data, col_name, n_bins, prefix) {
+    if (is.null(col_name)) {
+      return(NULL)
+    }
+    
+    # Si la variable est déjà catégorielle, la retourner telle quelle
+    if (!is.numeric(data[[col_name]])) {
+      return(data[[col_name]])
+    }
+    
+    # Calculer les quantiles
+    values <- data[[col_name]]
+    values_clean <- values[!is.na(values)]
+    
+    # Si pas assez de valeurs uniques, créer un facteur constant
+    unique_vals <- unique(values_clean)
+    if (length(unique_vals) <= 1) {
+      return(factor(rep(paste0(prefix, "_Q1"), length(values))))
+    }
+    
+    # Calculer les breaks en utilisant les quantiles
+    probs <- seq(0, 1, length.out = n_bins + 1)
+    breaks <- unique(quantile(values, probs = probs, na.rm = TRUE))
+    
+    # Si on a moins de breaks qu'attendu (valeurs dupliquées)
+    n_actual_bins <- length(breaks) - 1
+    
+    if (n_actual_bins < 1) {
+      # Tous les quantiles sont identiques
+      return(factor(rep(paste0(prefix, "_Q1"), length(values))))
+    }
+    
+    # Créer les labels appropriés
+    labels <- paste0(prefix, "_Q", 1:n_actual_bins)
+    
+    # Discrétiser
+    result <- cut(
+      values,
+      breaks = breaks,
       include.lowest = TRUE,
-      labels = paste0("gfr_Q", 1:n_gfr_bins)
+      labels = labels,
+      right = TRUE
     )
-  } else if (!is.null(gfr_col)) {
-    # Si gfr est déjà catégoriel, l'utiliser directement
-    data_work$gfr_bin_temp <- data_work[[gfr_col]]
+    
+    return(result)
   }
   
-  # dicrétiser le num_var1  si specifié et c'est numerique 
-  if (!is.null(num_var1) && is.numeric(data_work[[num_var1]])) {
-    data_work$numvar1_bin_temp <- cut(
-      data_work[[num_var1]], 
-      breaks = quantile(data_work[[num_var1]], 
-                        probs = seq(0, 1, length.out = n_gfr_bins + 1),
-                        na.rm = TRUE),
-      include.lowest = TRUE,
-      labels = paste0("numvar1_bin_temp_Q", 1:n_gfr_bins)
-    )
-  } else if (!is.null(num_var1)) {
-    # Si gfr est déjà catégoriel, l'utiliser directement
-    data_work$numvar1_bin_temp <- data_work[[num_var1]]
-  }
+  # ==========================================================================
+  # 4. DISCRÉTISER TOUTES LES VARIABLES CONTINUES
+  # ==========================================================================
   
+  data_work$age_bin_temp <- discretize_variable(
+    data_work, age_col, n_age_bins, "age"
+  )
   
-  # dicrétiser le num_var1  si specifié et c'est numerique 
-  if (!is.null(num_var2) && is.numeric(data_work[[num_var2]])) {
-    data_work$numvar2_bin_temp <- cut(
-      data_work[[num_var2]], 
-      breaks = quantile(data_work[[num_var2]], 
-                        probs = seq(0, 1, length.out = n_gfr_bins + 1),
-                        na.rm = TRUE),
-      include.lowest = TRUE,
-      labels = paste0("numvar2_bin_temp_Q", 1:n_gfr_bins)
-    )
-  } else if (!is.null(num_var2)) {
-    # Si gfr est déjà catégoriel, l'utiliser directement
-    data_work$numvar2_bin_temp <- data_work[[num_var2]]
-  }
+  data_work$gfr_bin_temp <- discretize_variable(
+    data_work, gfr_col, n_gfr_bins, "gfr"
+  )
   
-  # --------------------------------------------------------------------------
-  # 4. CRÉER LA VARIABLE DE STRATIFICATION COMBINÉE
-  # --------------------------------------------------------------------------
+  data_work$numvar1_bin_temp <- discretize_variable(
+    data_work, num_var1, n_NM1_bind, "numvar1"
+  )
+  
+  data_work$numvar2_bin_temp <- discretize_variable(
+    data_work, num_var2, n_NM2_bind, "numvar2"
+  )
+  
+  # ==========================================================================
+  # 5. CRÉER LA VARIABLE DE STRATIFICATION COMBINÉE
+  # ==========================================================================
   
   strata_components <- list(data_work[[target_col]])
   
@@ -483,28 +508,28 @@ create_split <- function(data,
     strata_components <- c(strata_components, list(data_work[[sex_col]]))
   }
   
-  if (!is.null(age_col)) {
+  if (!is.null(age_col) && !is.null(data_work$age_bin_temp)) {
     strata_components <- c(strata_components, list(data_work$age_bin_temp))
   }
   
-  if (!is.null(gfr_col)) {
+  if (!is.null(gfr_col) && !is.null(data_work$gfr_bin_temp)) {
     strata_components <- c(strata_components, list(data_work$gfr_bin_temp))
   }
   
-  if (!is.null(num_var1)) {
+  if (!is.null(num_var1) && !is.null(data_work$numvar1_bin_temp)) {
     strata_components <- c(strata_components, list(data_work$numvar1_bin_temp))
   }
   
-  if (!is.null(num_var2)) {
+  if (!is.null(num_var2) && !is.null(data_work$numvar2_bin_temp)) {
     strata_components <- c(strata_components, list(data_work$numvar2_bin_temp))
   }
   
   # Combiner toutes les variables en une seule strate
   strata <- do.call(paste, c(strata_components, sep = "_"))
   
-  # --------------------------------------------------------------------------
-  # 5. CRÉER LES INDICES TRAIN/VALIDATION PAR STRATE
-  # --------------------------------------------------------------------------
+  # ==========================================================================
+  # 6. CRÉER LES INDICES TRAIN/VALIDATION PAR STRATE
+  # ==========================================================================
   
   train_indices <- c()
   unique_strata <- unique(strata)
@@ -513,10 +538,15 @@ create_split <- function(data,
     stratum_indices <- which(strata == stratum)
     n_stratum <- length(stratum_indices)
     
+    # Si la strate est vide, passer
+    if (n_stratum == 0) {
+      next
+    }
+    
     # Calculer le nombre d'observations pour train
     n_train_stratum <- floor(n_stratum * train_ratio)
     
-    # S'assurer d'avoir au moins 1 observation en train si la strate n'est pas vide
+    # S'assurer d'avoir au moins 1 observation en train si possible
     if (n_train_stratum == 0 && n_stratum > 0) {
       n_train_stratum <- 1
     }
@@ -530,7 +560,7 @@ create_split <- function(data,
     if (n_train_stratum > 0 && n_train_stratum < n_stratum) {
       train_stratum_indices <- sample(stratum_indices, size = n_train_stratum)
       train_indices <- c(train_indices, train_stratum_indices)
-    } else if (n_train_stratum > 0) {
+    } else if (n_train_stratum == n_stratum) {
       # Si tous les indices vont en train (strate trop petite)
       train_indices <- c(train_indices, stratum_indices)
     }
@@ -539,13 +569,25 @@ create_split <- function(data,
   # Créer les indices de validation
   validation_indices <- setdiff(1:nrow(data), train_indices)
   
-  # --------------------------------------------------------------------------
-  # 6. RETOURNER LES SPLITS
-  # --------------------------------------------------------------------------
+  # ==========================================================================
+  # 7. VÉRIFICATIONS FINALES
+  # ==========================================================================
+  
+  if (length(train_indices) == 0) {
+    stop("Aucun échantillon n'a été sélectionné pour l'ensemble d'entraînement")
+  }
+  
+  if (length(validation_indices) == 0) {
+    warning("Aucun échantillon n'a été sélectionné pour l'ensemble de validation")
+  }
+  
+  # ==========================================================================
+  # 8. RETOURNER LES SPLITS
+  # ==========================================================================
   
   list(
-    train = data[train_indices, ],
-    validation = data[validation_indices, ]
+    train = data[train_indices, , drop = FALSE],
+    validation = data[validation_indices, , drop = FALSE]
   )
 }
 
