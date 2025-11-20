@@ -18,7 +18,7 @@ usePackage("gtsummary")
 usePackage("readxl")
 usePackage("data.table")
 usePackage("shinyBS")
-usePackage("zip")
+usePackage("utils")
 
 library(shiny)
 library(shinycssloaders)
@@ -31,7 +31,7 @@ library(gtsummary)
 library(readxl)
 library(data.table)
 library(shinyBS)
-library(zip)
+library(utils)
 
 # confirmdata<-function(toto){
 #   toto<-as.data.frame(toto)
@@ -146,7 +146,7 @@ transformdata <- function(toto, transpose) {
     # Conversion automatique des colonnes numériques 
     toto[] <- lapply(toto, function(x) {
       num_x <- suppressWarnings(as.numeric(as.character(x)))
-      if(sum(!is.na(num_x)) / length(x) > 0.8) num_x else x
+      if(sum(!is.na(num_x)) / length(x) > 0.99) num_x else x
     })
   }
   
@@ -1171,7 +1171,7 @@ ui <- fluidPage(
                                              # ), 
                                              fluidRow(
                                                box(
-                                                 title = "Parametrs of split",
+                                                 title = "Splitting parameters",
                                                  status = "warning",
                                                  solidHeader = TRUE,
                                                  width = 3,
@@ -1199,7 +1199,7 @@ ui <- fluidPage(
                                                ),
                                                box(
                                                  width = 3,
-                                                 title = "startifcation Variables",
+                                                 title = "Stratification variables",
                                                  status = "warning",
                                                  solidHeader = TRUE,
                                                  uiOutput("stratified_vars_ui")
@@ -1771,7 +1771,7 @@ server <- function(input, output, session) {
     
     fluidRow(
       # Sex (optionnel)
-      checkboxInput("use_sex","Stratify by sex", value = FALSE),
+      checkboxInput("use_sex","Stratify by sex(or categorical variable)", value = FALSE),
       
       conditionalPanel(
         condition = sprintf("input['%s']", "use_sex"),
@@ -1811,12 +1811,12 @@ server <- function(input, output, session) {
         #   step = 1
         # )
       ),
-      checkboxInput("use_numvars1", "stratfiy by a numeric var", value =  FALSE),
+      checkboxInput("use_numvars1", "Stratfiy by a numeric variable", value =  FALSE),
       conditionalPanel(condition = sprintf("input['%s']", "use_numvars1"),
                        selectInput("numvars1","choose a numerical variable : ", 
                                    choices =  names(data[final_cols])[sapply(data[final_cols], is.numeric)] )
                        ),
-      checkboxInput("use_numvars2", label = "stratfiy by another numeric var", value = FALSE),
+      checkboxInput("use_numvars2", label = "Stratfiy by another numeric variable", value = FALSE),
       conditionalPanel(condition = sprintf("input['%s']", "use_numvars2"), 
                        selectInput("numvar2", "choose a numerical variable : " , 
                                    choices = names(data[final_cols])[sapply(data[final_cols], is.numeric)])
