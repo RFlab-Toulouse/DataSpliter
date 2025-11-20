@@ -1756,7 +1756,7 @@ server <- function(input, output, session) {
       splits <- splits_generated()
       files_to_zip <- sapply(splits, function(x) x$file_path)
       
-      zip(file, files_to_zip, flags = "-j")
+      utils::zip(file, files_to_zip, flags = "-j")
     }
   )
   
