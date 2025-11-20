@@ -18,6 +18,7 @@ usePackage("gtsummary")
 usePackage("readxl")
 usePackage("data.table")
 usePackage("shinyBS")
+usePackage("zip")
 
 library(shiny)
 library(shinycssloaders)
@@ -30,6 +31,7 @@ library(gtsummary)
 library(readxl)
 library(data.table)
 library(shinyBS)
+library(zip)
 
 # confirmdata<-function(toto){
 #   toto<-as.data.frame(toto)
@@ -1357,6 +1359,7 @@ server <- function(input, output, session) {
                             sheet = input$sheetn,
                             skip = input$skipn,
                             col_names = ifelse(input$check_colnames == "FALSE", FALSE, TRUE),
+                            
                             )  %>% as.data.frame()
           rownames(data) <- NULL 
         } else {
