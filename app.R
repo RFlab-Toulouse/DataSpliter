@@ -1612,12 +1612,13 @@ server <- function(input, output, session) {
       target_col <- input$target_col
       n_splits <- input$n_splits
       
-      # if(unique(data[[input$target_col]])> 0.8*nrow(data)){
-      #   shinyalert::shinyalert(
-      #     html = TRUE,
-      #     text = paste("Are you sure that" , input$target_col, " is the Target/label variable? ")
-      #   )
-      # }
+      if(length(unique(data[[input$target_col]])) > 0.8*nrow(data)){
+        shinyalert::shinyalert(
+          html = TRUE,
+          type = "warning",
+          text = paste("Are you sure that" , input$target_col, " is the Target/label variable? ")
+        )
+      }
       
       # Validation
       if (n_splits < 1 || n_splits > 100) {
