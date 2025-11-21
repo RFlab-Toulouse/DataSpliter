@@ -402,7 +402,7 @@ create_split <- function(data,
   
   # Vérifier que target_col existe
   if (!target_col %in% names(data)) {
-    stop(paste("La colonne", target_col, "n'existe pas dans les données"))
+    stop(paste("The column", target_col, "does not exist in the data"))
   }
   
   # Vérifier les autres colonnes si spécifiées
@@ -411,11 +411,11 @@ create_split <- function(data,
   
   missing_cols <- setdiff(cols_to_check, names(data))
   if (length(missing_cols) > 0) {
-    stop(paste("Colonnes manquantes:", paste(missing_cols, collapse = ", ")))
+    stop(paste("Missing columns :", paste(missing_cols, collapse = ", ")))
   }
   
   if (train_ratio <= 0 || train_ratio >= 1) {
-    stop("train_ratio doit être entre 0 et 1")
+    stop("train_ratio must be between 0 and 1")
   }
   
   # ==========================================================================
@@ -576,11 +576,11 @@ create_split <- function(data,
   # ==========================================================================
   
   if (length(train_indices) == 0) {
-    stop("Aucun échantillon n'a été sélectionné pour l'ensemble d'entraînement")
+    stop("No samples were selected for the training set.")
   }
   
   if (length(validation_indices) == 0) {
-    warning("Aucun échantillon n'a été sélectionné pour l'ensemble de validation")
+    warning("No samples were selected for the validation set.")
   }
   
   # ==========================================================================
@@ -1611,6 +1611,13 @@ server <- function(input, output, session) {
       base_seed <- 123 # input$base_seed
       target_col <- input$target_col
       n_splits <- input$n_splits
+      
+      # if(unique(data[[input$target_col]])> 0.8*nrow(data)){
+      #   shinyalert::shinyalert(
+      #     html = TRUE,
+      #     text = paste("Are you sure that" , input$target_col, " is the Target/label variable? ")
+      #   )
+      # }
       
       # Validation
       if (n_splits < 1 || n_splits > 100) {
