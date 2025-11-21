@@ -264,7 +264,7 @@ calculate_descriptive_stats <- function(data, target_col, clinic_vars = NULL) {
     numeric_vars <- setdiff(numeric_vars, target_col)
     categorical_vars <- setdiff(categorical_vars, target_col)
     
-    numeric_vars <- numeric_vars[!grepl("\\d+$", numeric_vars)]
+    numeric_vars <- numeric_vars[!grepl("^\\d+$", numeric_vars)]
   }else{
     numeric_vars = clinic_vars
     categorical_vars =  setdiff(names(data)[sapply(data, function(x) is.factor(x) | is.character(x))], target_col)
@@ -1828,3 +1828,262 @@ server <- function(input, output, session) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+
+
+
+#'  gère mieux les cas limites et valide les résultats
+#' @param data Data frame contenant les données
+#' @param train_ratio Proportion train (0-1)
+#' @param target_col Nom de la colonne cible (obligatoire)
+#' @param strat_vars Vecteur de noms de colonnes pour stratification (max 3 recommandé)
+#' @param n_bins Nombre de bins pour variables continues (défaut: 4)
+#' @param seed Graine aléatoire
+#' @param min_strata_size Taille minimale acceptable d'une strate (défaut: 3)
+#' 
+#' @return Liste avec $train, $validation, et $quality_report
+#' create_split_improved <- function(data, 
+#'                                   train_ratio = 0.7,
+#'                                   target_col,
+#'                                   strat_vars = NULL,
+#'                                   n_bins = 4,
+#'                                   seed = NULL,
+#'                                   min_strata_size = 3) {
+#'   
+#'   # ==========================================================================
+#'   # 1. VALIDATION DES ENTRÉES
+#'   # ==========================================================================
+#'   
+#'   if (!is.null(seed)) set.seed(seed)
+#'   
+#'   # Vérifier que target_col existe
+#'   if (!target_col %in% names(data)) {
+#'     stop(paste("La colonne", target_col, "n'existe pas"))
+#'   }
+#'   
+#'   # Limiter le nombre de variables de stratification
+#'   if (!is.null(strat_vars) && length(strat_vars) > 3) {
+#'     warning("Plus de 3 variables de stratification peut causer des problèmes. Limitez-vous à 3 max.")
+#'   }
+#'   
+#'   # Vérifier que les colonnes existent
+#'   if (!is.null(strat_vars)) {
+#'     missing_cols <- setdiff(strat_vars, names(data))
+#'     if (length(missing_cols) > 0) {
+#'       stop(paste("Colonnes manquantes:", paste(missing_cols, collapse = ", ")))
+#'     }
+#'   }
+#'   
+#'   if (train_ratio <= 0 || train_ratio >= 1) {
+#'     stop("train_ratio doit être entre 0 et 1")
+#'   }
+#'   
+#'   # ==========================================================================
+#'   # 2. CRÉER LES STRATES
+#'   # ==========================================================================
+#'   
+#'   data_work <- data
+#'   strata_components <- list(data_work[[target_col]])
+#'   strata_names <- c(target_col)
+#'   
+#'   # Discrétiser les variables continues si nécessaire
+#'   if (!is.null(strat_vars)) {
+#'     for (var in strat_vars) {
+#'       if (is.numeric(data_work[[var]])) {
+#'         # Discrétiser en quantiles
+#'         breaks <- unique(quantile(data_work[[var]], 
+#'                                   probs = seq(0, 1, length.out = n_bins + 1), 
+#'                                   na.rm = TRUE))
+#'         
+#'         n_actual_bins <- length(breaks) - 1
+#'         
+#'         if (n_actual_bins < n_bins) {
+#'           message(sprintf(
+#'             "Variable '%s': %d bins demandés, mais seulement %d créés (peu de variation)",
+#'             var, n_bins, n_actual_bins
+#'           ))
+#'         }
+#'         
+#'         if (n_actual_bins >= 2) {
+#'           data_work[[paste0(var, "_bin")]] <- cut(
+#'             data_work[[var]],
+#'             breaks = breaks,
+#'             include.lowest = TRUE,
+#'             labels = paste0(var, "_Q", 1:n_actual_bins)
+#'           )
+#'           strata_components <- c(strata_components, list(data_work[[paste0(var, "_bin")]]))
+#'           strata_names <- c(strata_names, var)
+#'         } else {
+#'           warning(sprintf("Variable '%s' ignorée (pas assez de variation)", var))
+#'         }
+#'       } else {
+#'         # Variable catégorielle
+#'         strata_components <- c(strata_components, list(data_work[[var]]))
+#'         strata_names <- c(strata_names, var)
+#'       }
+#'     }
+#'   }
+#'   
+#'   # Créer la variable de strate combinée
+#'   strata <- do.call(paste, c(strata_components, sep = "_"))
+#'   
+#'   # ==========================================================================
+#'   # 3. VÉRIFIER LA QUALITÉ DE LA STRATIFICATION
+#'   # ==========================================================================
+#'   
+#'   strata_sizes <- table(strata)
+#'   n_strata <- length(strata_sizes)
+#'   
+#'   # Diagnostics
+#'   small_strata <- sum(strata_sizes < min_strata_size)
+#'   singleton_strata <- sum(strata_sizes == 1)
+#'   
+#'   if (small_strata > 0) {
+#'     warning(sprintf(
+#'       "Attention: %d/%d strates ont moins de %d observations (%.1f%%).",
+#'       small_strata, n_strata, min_strata_size, 
+#'       100 * small_strata / n_strata
+#'     ))
+#'   }
+#'   
+#'   if (singleton_strata > 0) {
+#'     warning(sprintf(
+#'       "Attention: %d strates n'ont qu'1 seule observation. Le ratio train/test ne sera pas respecté.",
+#'       singleton_strata
+#'     ))
+#'   }
+#'   
+#'   # ==========================================================================
+#'   # 4. CRÉER LES SPLITS
+#'   # ==========================================================================
+#'   
+#'   train_indices <- c()
+#'   problematic_strata <- character(0)
+#'   
+#'   for (stratum in names(strata_sizes)) {
+#'     stratum_indices <- which(strata == stratum)
+#'     n_stratum <- length(stratum_indices)
+#'     
+#'     if (n_stratum == 0) next
+#'     
+#'     # Calculer n_train
+#'     n_train_stratum <- floor(n_stratum * train_ratio)
+#'     
+#'     # Gérer les cas limites
+#'     if (n_stratum == 1) {
+#'       # 1 seul échantillon: le mettre en train
+#'       train_indices <- c(train_indices, stratum_indices)
+#'       problematic_strata <- c(problematic_strata, stratum)
+#'       next
+#'     }
+#'     
+#'     if (n_stratum == 2) {
+#'       # 2 échantillons: 1 en train, 1 en validation
+#'       train_indices <- c(train_indices, sample(stratum_indices, 1))
+#'       next
+#'     }
+#'     
+#'     # Cas normal: n >= 3
+#'     if (n_train_stratum == 0) n_train_stratum <- 1
+#'     if (n_train_stratum >= n_stratum) n_train_stratum <- n_stratum - 1
+#'     
+#'     train_stratum_indices <- sample(stratum_indices, size = n_train_stratum)
+#'     train_indices <- c(train_indices, train_stratum_indices)
+#'   }
+#'   
+#'   validation_indices <- setdiff(1:nrow(data), train_indices)
+#'   
+#'   # ==========================================================================
+#'   # 5. VALIDATION DE LA QUALITÉ DU SPLIT
+#'   # ==========================================================================
+#'   
+#'   train_data <- data[train_indices, ]
+#'   validation_data <- data[validation_indices, ]
+#'   
+#'   # Distribution de la target
+#'   train_target_dist <- prop.table(table(train_data[[target_col]]))
+#'   valid_target_dist <- prop.table(table(validation_data[[target_col]]))
+#'   
+#'   # Test chi² (si assez d'observations)
+#'   chisq_result <- tryCatch({
+#'     ct <- table(
+#'       c(rep("train", nrow(train_data)), rep("validation", nrow(validation_data))),
+#'       c(train_data[[target_col]], validation_data[[target_col]])
+#'     )
+#'     if (all(ct >= 5)) {
+#'       chisq.test(ct)
+#'     } else {
+#'       NULL
+#'     }
+#'   }, error = function(e) NULL)
+#'   
+#'   # Rapport de qualité
+#'   quality_report <- list(
+#'     n_total = nrow(data),
+#'     n_train = nrow(train_data),
+#'     n_validation = nrow(validation_data),
+#'     train_ratio_actual = nrow(train_data) / nrow(data),
+#'     train_ratio_requested = train_ratio,
+#'     n_strata = n_strata,
+#'     small_strata = small_strata,
+#'     singleton_strata = singleton_strata,
+#'     problematic_strata = problematic_strata,
+#'     train_target_dist = train_target_dist,
+#'     valid_target_dist = valid_target_dist,
+#'     chisq_p_value = if (!is.null(chisq_result)) chisq_result$p.value else NA,
+#'     stratification_vars = strata_names
+#'   )
+#'   
+#'   # ==========================================================================
+#'   # 6. RETOURNER LES RÉSULTATS
+#'   # ==========================================================================
+#'   
+#'   list(
+#'     train = train_data,
+#'     validation = validation_data,
+#'     quality_report = quality_report
+#'   )
+#' }
+#' 
+#' #' Afficher le rapport de qualité d'un split
+#' print_quality_report <- function(split_result) {
+#'   qr <- split_result$quality_report
+#'   
+#'   cat("==================== RAPPORT DE QUALITÉ DU SPLIT ====================\n\n")
+#'   
+#'   cat("TAILLE DES ENSEMBLES:\n")
+#'   cat(sprintf("  Total:      %d observations\n", qr$n_total))
+#'   cat(sprintf("  Train:      %d observations (%.1f%%, demandé: %.1f%%)\n", 
+#'               qr$n_train, qr$train_ratio_actual * 100, qr$train_ratio_requested * 100))
+#'   cat(sprintf("  Validation: %d observations (%.1f%%)\n\n", 
+#'               qr$n_validation, (1 - qr$train_ratio_actual) * 100))
+#'   
+#'   cat("STRATIFICATION:\n")
+#'   cat(sprintf("  Variables:  %s\n", paste(qr$stratification_vars, collapse = ", ")))
+#'   cat(sprintf("  N strates:  %d\n", qr$n_strata))
+#'   cat(sprintf("  Strates <3: %d (%.1f%%)\n", 
+#'               qr$small_strata, 100 * qr$small_strata / qr$n_strata))
+#'   cat(sprintf("  Singletons: %d\n\n", qr$singleton_strata))
+#'   
+#'   cat("DISTRIBUTION DE LA VARIABLE CIBLE:\n")
+#'   cat("  Train:\n")
+#'   print(round(qr$train_target_dist, 3))
+#'   cat("  Validation:\n")
+#'   print(round(qr$valid_target_dist, 3))
+#'   
+#'   if (!is.na(qr$chisq_p_value)) {
+#'     cat(sprintf("\n  Test chi²: p = %.4f", qr$chisq_p_value))
+#'     if (qr$chisq_p_value > 0.05) {
+#'       cat(" ✓ (distributions similaires)\n")
+#'     } else {
+#'       cat(" ✗ (distributions significativement différentes)\n")
+#'     }
+#'   }
+#'   
+#'   if (length(qr$problematic_strata) > 0) {
+#'     cat(sprintf("\n⚠️  AVERTISSEMENT: %d strates problématiques (ratio non respecté)\n", 
+#'                 length(qr$problematic_strata)))
+#'   }
+#'   
+#'   cat("\n======================================================================\n")
+#' }
+
