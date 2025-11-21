@@ -18,7 +18,7 @@ usePackage("gtsummary")
 usePackage("readxl")
 usePackage("data.table")
 usePackage("shinyBS")
-usePackage("utils")
+usePackage("zip")
 
 library(shiny)
 library(shinycssloaders)
@@ -31,7 +31,7 @@ library(gtsummary)
 library(readxl)
 library(data.table)
 library(shinyBS)
-library(utils)
+library(zip)
 
 # confirmdata<-function(toto){
 #   toto<-as.data.frame(toto)
@@ -1752,13 +1752,51 @@ server <- function(input, output, session) {
     content = function(file) {
       req(splits_generated())
       
-      # créeation fichier ZIP avec tous les splits
-      splits <- splits_generated()
-      files_to_zip <- sapply(splits, function(x) x$file_path)
-      
-      utils::zip(file, files_to_zip, flags = "-j")
+      tryCatch({
+        splits <- splits_generated()
+        files_to_zip <- sapply(splits, function(x) x$file_path)
+        
+        # Vérifier que tous les fichiers existent
+        if (!all(file.exists(files_to_zip))) {
+          showNotification("Erreur: Certains fichiers sont manquants", type = "error")
+          return()
+        }
+        
+        zip::zip(
+          zipfile = file,
+          files = files_to_zip,
+          mode = "cherry-pick",
+          include_directories = FALSE
+        )
+        
+        showNotification(
+          sprintf("%d fichiers compressés avec succès", length(files_to_zip)),
+          type = "message"
+        )
+        
+      }, error = function(e) {
+        showNotification(
+          paste("Erreur lors de la création du ZIP:", e$message),
+          type = "error",
+          duration = 10
+        )
+      })
     }
   )
+  # output$download_all <- downloadHandler(
+  #   filename = function() {
+  #     paste0("splits_train_validation_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".zip")
+  #   },
+  #   content = function(file) {
+  #     req(splits_generated())
+  #     
+  #     # créeation fichier ZIP avec tous les splits
+  #     splits <- splits_generated()
+  #     files_to_zip <- sapply(splits, function(x) x$file_path)
+  #     
+  #     utils::zip(file, files_to_zip, flags = "-j")
+  #   }
+  # )
   
   output$stratified_vars_ui <- renderUI({
     req(data_loaded())
